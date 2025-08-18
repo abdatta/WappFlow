@@ -7,9 +7,9 @@
  * configured timezone from settings.
  */
 
-import { getSchedules, saveSchedules, getSettings } from './store.js';
-import { Schedule, ScheduleDto, SchedulesFile } from './types.js';
-import { clampInterval, now, toIso, uuid } from './utils.js';
+import { getSchedules, saveSchedules, getSettings } from "./store.js";
+import { Schedule, ScheduleDto, SchedulesFile } from "./types.js";
+import { clampInterval, now, toIso, uuid } from "./utils.js";
 
 export type ScheduleSendFn = (payload: {
   phone: string;
@@ -20,7 +20,7 @@ export type ScheduleSendFn = (payload: {
 
 export class Scheduler {
   private schedules: Schedule[] = [];
-  private tz: string = 'UTC';
+  private tz: string = "UTC";
   private timer: NodeJS.Timeout | null = null;
   private sendFn!: ScheduleSendFn;
 
@@ -70,7 +70,10 @@ export class Scheduler {
    * Persist current schedules to disk.
    */
   private async persist(): Promise<void> {
-    const file: SchedulesFile = { schedules: this.schedules, meta: { tz: this.tz } };
+    const file: SchedulesFile = {
+      schedules: this.schedules,
+      meta: { tz: this.tz },
+    };
     await saveSchedules(file);
   }
 
@@ -83,7 +86,7 @@ export class Scheduler {
     this.sendFn = sendFn;
     if (this.timer) return;
     this.timer = setInterval(() => {
-      this.tick().catch((err) => console.error('Scheduler tick error', err));
+      this.tick().catch((err) => console.error("Scheduler tick error", err));
     }, 30000);
   }
 
@@ -105,15 +108,22 @@ export class Scheduler {
       const next = new Date(sched.nextRunAt);
       if (next <= nowDt) {
         try {
-          await this.sendFn({ phone: sched.phone, text: sched.text, disablePrefix: sched.disablePrefix, scheduleId: sched.id });
+          await this.sendFn({
+            phone: sched.phone,
+            text: sched.text,
+            disablePrefix: sched.disablePrefix,
+            scheduleId: sched.id,
+          });
           sched.lastRunAt = toIso(nowDt);
         } catch (err) {
           sched.failures++;
-          console.error('Schedule execution failed', err);
+          console.error("Schedule execution failed", err);
         }
         if (sched.intervalMinutes) {
           // recurring; schedule next interval
-          const nextDate = new Date(next.getTime() + sched.intervalMinutes * 60000);
+          const nextDate = new Date(
+            next.getTime() + sched.intervalMinutes * 60000,
+          );
           sched.nextRunAt = toIso(nextDate);
         } else {
           // one‑off; deactivate
@@ -154,13 +164,16 @@ export class Scheduler {
       active: dto.active ?? true,
       lastRunAt: null,
       failures: 0,
-      createdAt: toIso(now(this.tz))
+      createdAt: toIso(now(this.tz)),
     };
     // Compute nextRunAt beyond now for recurring jobs
     if (schedule.intervalMinutes) {
       const intervalMs = schedule.intervalMinutes * 60000;
       let next = new Date(schedule.nextRunAt);
-      while (schedule.active && next.getTime() <= now(this.tz).getTime() + 10000) {
+      while (
+        schedule.active &&
+        next.getTime() <= now(this.tz).getTime() + 10000
+      ) {
         next = new Date(next.getTime() + intervalMs);
       }
       schedule.nextRunAt = toIso(next);
@@ -173,13 +186,17 @@ export class Scheduler {
   /**
    * Update a schedule by id. Only provided fields will be updated.
    */
-  async update(id: string, updates: Partial<ScheduleDto>): Promise<Schedule | undefined> {
+  async update(
+    id: string,
+    updates: Partial<ScheduleDto>,
+  ): Promise<Schedule | undefined> {
     const sched = this.get(id);
     if (!sched) return undefined;
     if (updates.phone) sched.phone = updates.phone;
     if (updates.text) sched.text = updates.text;
-    if (typeof updates.disablePrefix === 'boolean') sched.disablePrefix = updates.disablePrefix;
-    if (typeof updates.active === 'boolean') sched.active = updates.active;
+    if (typeof updates.disablePrefix === "boolean")
+      sched.disablePrefix = updates.disablePrefix;
+    if (typeof updates.active === "boolean") sched.active = updates.active;
     if (updates.firstRunAt) {
       sched.firstRunAt = updates.firstRunAt;
     }
@@ -233,11 +250,18 @@ export class Scheduler {
     if (!sched) return false;
     if (!this.sendFn) return false;
     try {
-      await this.sendFn({ phone: sched.phone, text: sched.text, disablePrefix: sched.disablePrefix, scheduleId: sched.id });
+      await this.sendFn({
+        phone: sched.phone,
+        text: sched.text,
+        disablePrefix: sched.disablePrefix,
+        scheduleId: sched.id,
+      });
       sched.lastRunAt = toIso(now(this.tz));
       if (sched.intervalMinutes) {
         const next = new Date(sched.lastRunAt);
-        sched.nextRunAt = toIso(new Date(next.getTime() + sched.intervalMinutes * 60000));
+        sched.nextRunAt = toIso(
+          new Date(next.getTime() + sched.intervalMinutes * 60000),
+        );
       } else {
         sched.active = false;
       }
@@ -246,7 +270,7 @@ export class Scheduler {
     } catch (err) {
       sched.failures++;
       await this.persist();
-      console.error('RunNow failed', err);
+      console.error("RunNow failed", err);
       return false;
     }
   }

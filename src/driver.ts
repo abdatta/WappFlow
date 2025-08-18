@@ -9,17 +9,17 @@
  * replace these stubs without affecting the rest of the codebase.
  */
 
-import { chromium, Browser, BrowserContext, Page } from 'playwright';
-import { EventEmitter } from 'events';
-import path from 'path';
-import { Settings, SessionState } from './types.js';
-import { now, delay } from './utils.js';
+import { chromium, Browser, BrowserContext, Page } from "playwright";
+import { EventEmitter } from "events";
+import path from "path";
+import { Settings, SessionState } from "./types.js";
+import { now, delay } from "./utils.js";
 
 export interface DriverEvents {
-  'qr_required': () => void;
-  'relinked': () => void;
-  'offline': () => void;
-  'error': (err: any) => void;
+  qr_required: () => void;
+  relinked: () => void;
+  offline: () => void;
+  error: (err: any) => void;
 }
 
 /**
@@ -47,24 +47,24 @@ export class WhatsAppDriver extends EventEmitter {
    */
   async init(): Promise<void> {
     const headless = this.settings.headless;
-    const userDataDir = path.join(process.cwd(), 'profiles', 'whatsapp');
+    const userDataDir = path.join(process.cwd(), "profiles", "whatsapp");
     this.browser = await chromium.launchPersistentContext(userDataDir, {
       headless,
-      args: ['--start-maximized'],
-      viewport: { width: 1280, height: 800 }
+      args: ["--start-maximized"],
+      viewport: { width: 1280, height: 800 },
     });
     const [page] = this.browser.pages();
     this.page = page;
     // Navigate to WhatsApp Web home page
     try {
-      await page.goto('https://web.whatsapp.com');
+      await page.goto("https://web.whatsapp.com");
       // In this stub we don't implement QR detection; we mark ready after 5 seconds
       await delay(5000);
       this.session.ready = true;
       this.session.lastReadyAt = now(this.settings.timezone).toISOString();
-      this.emit('relinked');
+      this.emit("relinked");
     } catch (err) {
-      this.emit('error', err);
+      this.emit("error", err);
     }
   }
 
@@ -82,8 +82,8 @@ export class WhatsAppDriver extends EventEmitter {
   async ensureReady(): Promise<void> {
     if (!this.isReady()) {
       // In a real implementation we would capture the QR code here
-      this.emit('qr_required');
-      throw new Error('QR_REQUIRED');
+      this.emit("qr_required");
+      throw new Error("QR_REQUIRED");
     }
   }
 
@@ -95,7 +95,7 @@ export class WhatsAppDriver extends EventEmitter {
    * selectors and error handling would be required.
    */
   async sendText(phone: string, text: string): Promise<void> {
-    if (!this.page) throw new Error('Driver not initialised');
+    if (!this.page) throw new Error("Driver not initialised");
     await this.ensureReady();
     const encoded = encodeURIComponent(text);
     const url = `https://web.whatsapp.com/send?phone=${phone}&text=${encoded}`;
@@ -106,7 +106,7 @@ export class WhatsAppDriver extends EventEmitter {
     // Small random delay
     await delay(400 + Math.random() * 800);
     // Press enter to send
-    await this.page.keyboard.press('Enter');
+    await this.page.keyboard.press("Enter");
     // Confirm bubble by waiting a bit
     await delay(1000);
   }

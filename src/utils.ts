@@ -5,8 +5,8 @@
  * of the code more readable.
  */
 
-import { parsePhoneNumberFromString, AsYouType } from 'libphonenumber-js';
-import crypto from 'node:crypto';
+import { parsePhoneNumberFromString, AsYouType } from "libphonenumber-js";
+import crypto from "node:crypto";
 
 /**
  * Validate and normalise a phone number into E.164 format. Throws
@@ -15,7 +15,7 @@ import crypto from 'node:crypto';
 export function validatePhone(input: string): string {
   const num = parsePhoneNumberFromString(input);
   if (!num || !num.isValid()) {
-    throw new Error('Invalid phone number');
+    throw new Error("Invalid phone number");
   }
   return num.number;
 }
@@ -25,7 +25,7 @@ export function validatePhone(input: string): string {
  * anonymising message contents when logging.
  */
 export function hashText(text: string): string {
-  return crypto.createHash('sha256').update(text, 'utf8').digest('hex');
+  return crypto.createHash("sha256").update(text, "utf8").digest("hex");
 }
 
 /**
@@ -55,7 +55,7 @@ export function now(tz?: string): Date {
   }
   // Convert local now to the desired timezone by constructing a
   // date string and letting the Date constructor parse it.
-  const localeString = new Date().toLocaleString('en-US', { timeZone: tz });
+  const localeString = new Date().toLocaleString("en-US", { timeZone: tz });
   return new Date(localeString);
 }
 
@@ -78,13 +78,15 @@ export function randomDelaySeconds(min: number, max: number): number {
  * presenting numbers in UI.
  */
 export function stripPhoneFormatting(input: string): string {
-  return input.replace(/\D+/g, '');
+  return input.replace(/\D+/g, "");
 }
 
 /**
  * Clamp a schedule interval to null or a minimum value of 60.
  */
-export function clampInterval(minutes: number | null | undefined): number | null {
+export function clampInterval(
+  minutes: number | null | undefined,
+): number | null {
   if (minutes == null) return null;
   return Math.max(60, Math.floor(minutes));
 }

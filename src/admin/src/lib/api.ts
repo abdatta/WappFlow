@@ -1,4 +1,4 @@
-import axios from 'axios';
+import axios from "axios";
 
 // A simple API wrapper around axios. The admin token is stored
 // locally in memory for demonstration purposes. In a real admin
@@ -11,45 +11,49 @@ export function setAdminToken(token: string) {
 }
 
 const instance = axios.create({
-  baseURL: '/api',
-  timeout: 10000
+  baseURL: "/api",
+  timeout: 10000,
 });
 
 instance.interceptors.request.use((config) => {
   if (adminToken) {
     config.headers = config.headers || {};
-    config.headers['Authorization'] = `Bearer ${adminToken}`;
+    config.headers["Authorization"] = `Bearer ${adminToken}`;
   }
   return config;
 });
 
 export async function fetchHealth() {
-  const res = await instance.get('/health');
+  const res = await instance.get("/health");
   return res.data;
 }
 
-export async function sendMessage(data: { phone: string; text: string; disablePrefix?: boolean }) {
-  const res = await instance.post('/send', data);
+export async function sendMessage(data: {
+  phone: string;
+  text: string;
+  disablePrefix?: boolean;
+}) {
+  const res = await instance.post("/send", data);
   return res.data;
 }
 
 export async function subscribePush(subscription: any) {
-  const res = await instance.post('/push/subscribe', subscription);
+  const res = await instance.post("/push/subscribe", subscription);
   return res.data;
 }
 
 export async function testPush() {
-  const res = await instance.post('/push/test');
+  const res = await instance.post("/push/test");
   return res.data;
 }
 
 export async function listSchedules() {
-  const res = await instance.get('/schedules');
+  const res = await instance.get("/schedules");
   return res.data;
 }
 
 export async function createSchedule(payload: any) {
-  const res = await instance.post('/schedules', payload);
+  const res = await instance.post("/schedules", payload);
   return res.data;
 }
 

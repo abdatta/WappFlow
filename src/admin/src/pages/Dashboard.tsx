@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { fetchHealth, sendMessage, testPush, subscribePush } from '../lib/api';
+import React, { useEffect, useState } from "react";
+import { fetchHealth, sendMessage, testPush, subscribePush } from "../lib/api";
 
 interface Health {
   session: { ready: boolean; qr: string | null };
@@ -11,8 +11,8 @@ interface Health {
 
 export default function Dashboard() {
   const [health, setHealth] = useState<Health | null>(null);
-  const [phone, setPhone] = useState('');
-  const [text, setText] = useState('');
+  const [phone, setPhone] = useState("");
+  const [text, setText] = useState("");
   const [disablePrefix, setDisablePrefix] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
@@ -35,21 +35,24 @@ export default function Dashboard() {
     e.preventDefault();
     try {
       await sendMessage({ phone, text, disablePrefix });
-      setMessage('Message sent');
-      setPhone('');
-      setText('');
+      setMessage("Message sent");
+      setPhone("");
+      setText("");
     } catch (err: any) {
-      setMessage(err.response?.data?.error || 'Error sending');
+      setMessage(err.response?.data?.error || "Error sending");
     }
     refresh();
   }
 
   async function handleSubscribe() {
-    if (!('serviceWorker' in navigator)) return;
+    if (!("serviceWorker" in navigator)) return;
     const reg = await navigator.serviceWorker.ready;
-    const subscription = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: undefined });
+    const subscription = await reg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: undefined,
+    });
     await subscribePush(subscription);
-    alert('Subscribed to push notifications');
+    alert("Subscribed to push notifications");
   }
 
   return (
@@ -59,7 +62,7 @@ export default function Dashboard() {
         <div className="grid grid-cols-2 gap-4">
           <div className="bg-gray-800 p-4 rounded-lg">
             <div className="text-lg font-medium">Session</div>
-            <p>{health.session.ready ? 'Ready' : 'Not ready'}</p>
+            <p>{health.session.ready ? "Ready" : "Not ready"}</p>
           </div>
           <div className="bg-gray-800 p-4 rounded-lg">
             <div className="text-lg font-medium">Daily Usage</div>
@@ -73,7 +76,7 @@ export default function Dashboard() {
           </div>
           <div className="bg-gray-800 p-4 rounded-lg">
             <div className="text-lg font-medium">Headless</div>
-            <p>{health.headless ? 'Enabled' : 'Disabled'}</p>
+            <p>{health.headless ? "Enabled" : "Disabled"}</p>
           </div>
         </div>
       )}
@@ -106,17 +109,26 @@ export default function Dashboard() {
             />
             <label htmlFor="disablePrefix">Disable prefix</label>
           </div>
-          <button type="submit" className="bg-green-600 hover:bg-green-700 px-4 py-2 rounded">
+          <button
+            type="submit"
+            className="bg-green-600 hover:bg-green-700 px-4 py-2 rounded"
+          >
             Send
           </button>
         </form>
         {message && <p className="text-sm text-yellow-400">{message}</p>}
       </div>
       <div className="flex gap-4">
-        <button onClick={handleSubscribe} className="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded">
+        <button
+          onClick={handleSubscribe}
+          className="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded"
+        >
           Subscribe to Push
         </button>
-        <button onClick={() => testPush()} className="bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded">
+        <button
+          onClick={() => testPush()}
+          className="bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded"
+        >
           Test Push
         </button>
       </div>

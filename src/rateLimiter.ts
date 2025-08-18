@@ -4,9 +4,9 @@
  * first run date. State is persisted to limits.json.
  */
 
-import { getLimits, saveLimits, getSettings, saveSettings } from './store.js';
-import { Limits, Settings, LimitCheckResult } from './types.js';
-import { now } from './utils.js';
+import { getLimits, saveLimits, getSettings, saveSettings } from "./store.js";
+import { Limits, Settings, LimitCheckResult } from "./types.js";
+import { now } from "./utils.js";
 
 export class RateLimiter {
   private settings!: Settings;
@@ -68,7 +68,8 @@ export class RateLimiter {
     this.perDay = perDay;
     // When caps change we should also clamp tokens/sentToday
     if (this.limits.tokens > this.perMin) this.limits.tokens = this.perMin;
-    if (this.limits.sentToday > this.perDay) this.limits.sentToday = this.perDay;
+    if (this.limits.sentToday > this.perDay)
+      this.limits.sentToday = this.perDay;
   }
 
   /**
@@ -80,7 +81,10 @@ export class RateLimiter {
     const elapsed = nowMs - this.limits.updatedAt;
     if (elapsed <= 0) return;
     const tokensToAdd = (this.perMin / 60000) * elapsed;
-    this.limits.tokens = Math.min(this.perMin, this.limits.tokens + tokensToAdd);
+    this.limits.tokens = Math.min(
+      this.perMin,
+      this.limits.tokens + tokensToAdd,
+    );
     this.limits.updatedAt = nowMs;
   }
 
@@ -110,10 +114,10 @@ export class RateLimiter {
     this.checkDayChange();
     this.refill();
     if (this.limits.sentToday + count > this.perDay) {
-      return { allowed: false, reason: 'Daily limit reached' };
+      return { allowed: false, reason: "Daily limit reached" };
     }
     if (this.limits.tokens < count) {
-      return { allowed: false, reason: 'Rate limit exceeded' };
+      return { allowed: false, reason: "Rate limit exceeded" };
     }
     // Consume tokens and increment counts
     this.limits.tokens -= count;
@@ -133,7 +137,7 @@ export class RateLimiter {
       sentToday: this.limits.sentToday,
       perMin: this.perMin,
       perDay: this.perDay,
-      today: this.limits.today
+      today: this.limits.today,
     };
   }
 }

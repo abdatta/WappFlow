@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState } from "react";
 import {
   listSchedules,
   createSchedule,
@@ -6,8 +6,8 @@ import {
   runSchedule,
   pauseSchedule,
   resumeSchedule,
-  updateSchedule
-} from '../lib/api';
+  updateSchedule,
+} from "../lib/api";
 
 interface Schedule {
   id: string;
@@ -24,14 +24,18 @@ interface Schedule {
 export default function Scheduling() {
   const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [form, setForm] = useState({
-    phone: '',
-    text: '',
+    phone: "",
+    text: "",
     disablePrefix: false,
-    firstRunAt: '',
-    intervalMinutes: '' as string | number,
-    active: true
+    firstRunAt: "",
+    intervalMinutes: "" as string | number,
+    active: true,
   });
-  const [edit, setEdit] = useState<{ id: string; intervalMinutes: string | number; firstRunAt: string } | null>(null);
+  const [edit, setEdit] = useState<{
+    id: string;
+    intervalMinutes: string | number;
+    firstRunAt: string;
+  } | null>(null);
   const [status, setStatus] = useState<string | null>(null);
 
   useEffect(() => {
@@ -54,16 +58,25 @@ export default function Scheduling() {
         phone: form.phone,
         text: form.text,
         disablePrefix: form.disablePrefix,
-        active: form.active
+        active: form.active,
       };
-      if (form.firstRunAt) payload.firstRunAt = new Date(form.firstRunAt).toISOString();
-      if (form.intervalMinutes) payload.intervalMinutes = Number(form.intervalMinutes);
+      if (form.firstRunAt)
+        payload.firstRunAt = new Date(form.firstRunAt).toISOString();
+      if (form.intervalMinutes)
+        payload.intervalMinutes = Number(form.intervalMinutes);
       await createSchedule(payload);
-      setStatus('Schedule created');
-      setForm({ phone: '', text: '', disablePrefix: false, firstRunAt: '', intervalMinutes: '', active: true });
+      setStatus("Schedule created");
+      setForm({
+        phone: "",
+        text: "",
+        disablePrefix: false,
+        firstRunAt: "",
+        intervalMinutes: "",
+        active: true,
+      });
       refresh();
     } catch (err: any) {
-      setStatus(err.response?.data?.error || 'Error creating');
+      setStatus(err.response?.data?.error || "Error creating");
     }
   }
 
@@ -87,8 +100,10 @@ export default function Scheduling() {
     e.preventDefault();
     if (!edit) return;
     const payload: any = {};
-    if (edit.firstRunAt) payload.firstRunAt = new Date(edit.firstRunAt).toISOString();
-    if (edit.intervalMinutes) payload.intervalMinutes = Number(edit.intervalMinutes);
+    if (edit.firstRunAt)
+      payload.firstRunAt = new Date(edit.firstRunAt).toISOString();
+    if (edit.intervalMinutes)
+      payload.intervalMinutes = Number(edit.intervalMinutes);
     await updateSchedule(edit.id, payload);
     setEdit(null);
     refresh();
@@ -123,7 +138,9 @@ export default function Scheduling() {
               type="checkbox"
               checked={form.disablePrefix}
               id="createDisablePrefix"
-              onChange={(e) => setForm({ ...form, disablePrefix: e.target.checked })}
+              onChange={(e) =>
+                setForm({ ...form, disablePrefix: e.target.checked })
+              }
             />
             <label htmlFor="createDisablePrefix">Disable prefix</label>
           </div>
@@ -143,7 +160,9 @@ export default function Scheduling() {
               min="0"
               step="60"
               value={form.intervalMinutes}
-              onChange={(e) => setForm({ ...form, intervalMinutes: e.target.value })}
+              onChange={(e) =>
+                setForm({ ...form, intervalMinutes: e.target.value })
+              }
               className="w-full px-3 py-2 rounded bg-gray-700 text-white"
             />
           </div>
@@ -156,7 +175,10 @@ export default function Scheduling() {
             />
             <label htmlFor="createActive">Active</label>
           </div>
-          <button type="submit" className="bg-green-600 hover:bg-green-700 px-4 py-2 rounded">
+          <button
+            type="submit"
+            className="bg-green-600 hover:bg-green-700 px-4 py-2 rounded"
+          >
             Create
           </button>
           {status && <p className="text-yellow-400 text-sm">{status}</p>}
@@ -180,29 +202,53 @@ export default function Scheduling() {
               {schedules.map((s) => (
                 <tr key={s.id} className="odd:bg-gray-700">
                   <td className="px-3 py-2 whitespace-nowrap">{s.phone}</td>
-                  <td className="px-3 py-2 whitespace-nowrap">{new Date(s.nextRunAt).toLocaleString()}</td>
-                  <td className="px-3 py-2 whitespace-nowrap">{s.intervalMinutes ?? 'None'}</td>
-                  <td className="px-3 py-2 whitespace-nowrap">{s.active ? 'Yes' : 'No'}</td>
+                  <td className="px-3 py-2 whitespace-nowrap">
+                    {new Date(s.nextRunAt).toLocaleString()}
+                  </td>
+                  <td className="px-3 py-2 whitespace-nowrap">
+                    {s.intervalMinutes ?? "None"}
+                  </td>
+                  <td className="px-3 py-2 whitespace-nowrap">
+                    {s.active ? "Yes" : "No"}
+                  </td>
                   <td className="px-3 py-2 whitespace-nowrap space-x-2">
                     <button
-                      onClick={() => setEdit({ id: s.id, intervalMinutes: s.intervalMinutes ?? '', firstRunAt: s.firstRunAt })}
+                      onClick={() =>
+                        setEdit({
+                          id: s.id,
+                          intervalMinutes: s.intervalMinutes ?? "",
+                          firstRunAt: s.firstRunAt,
+                        })
+                      }
                       className="bg-blue-600 hover:bg-blue-700 px-2 py-1 rounded"
                     >
                       Edit
                     </button>
-                    <button onClick={() => handleRun(s.id)} className="bg-green-600 hover:bg-green-700 px-2 py-1 rounded">
+                    <button
+                      onClick={() => handleRun(s.id)}
+                      className="bg-green-600 hover:bg-green-700 px-2 py-1 rounded"
+                    >
                       Run
                     </button>
                     {s.active ? (
-                      <button onClick={() => handlePause(s.id)} className="bg-yellow-600 hover:bg-yellow-700 px-2 py-1 rounded">
+                      <button
+                        onClick={() => handlePause(s.id)}
+                        className="bg-yellow-600 hover:bg-yellow-700 px-2 py-1 rounded"
+                      >
                         Pause
                       </button>
                     ) : (
-                      <button onClick={() => handleResume(s.id)} className="bg-purple-600 hover:bg-purple-700 px-2 py-1 rounded">
+                      <button
+                        onClick={() => handleResume(s.id)}
+                        className="bg-purple-600 hover:bg-purple-700 px-2 py-1 rounded"
+                      >
                         Resume
                       </button>
                     )}
-                    <button onClick={() => handleDelete(s.id)} className="bg-red-600 hover:bg-red-700 px-2 py-1 rounded">
+                    <button
+                      onClick={() => handleDelete(s.id)}
+                      className="bg-red-600 hover:bg-red-700 px-2 py-1 rounded"
+                    >
                       Delete
                     </button>
                   </td>
@@ -223,7 +269,9 @@ export default function Scheduling() {
                 <input
                   type="datetime-local"
                   value={edit.firstRunAt}
-                  onChange={(e) => setEdit({ ...edit, firstRunAt: e.target.value })}
+                  onChange={(e) =>
+                    setEdit({ ...edit, firstRunAt: e.target.value })
+                  }
                   className="w-full px-3 py-2 rounded bg-gray-700 text-white"
                 />
               </div>
@@ -234,15 +282,24 @@ export default function Scheduling() {
                   min="0"
                   step="60"
                   value={edit.intervalMinutes}
-                  onChange={(e) => setEdit({ ...edit, intervalMinutes: e.target.value })}
+                  onChange={(e) =>
+                    setEdit({ ...edit, intervalMinutes: e.target.value })
+                  }
                   className="w-full px-3 py-2 rounded bg-gray-700 text-white"
                 />
               </div>
               <div className="flex justify-end space-x-2">
-                <button type="button" onClick={() => setEdit(null)} className="bg-gray-600 hover:bg-gray-700 px-3 py-1 rounded">
+                <button
+                  type="button"
+                  onClick={() => setEdit(null)}
+                  className="bg-gray-600 hover:bg-gray-700 px-3 py-1 rounded"
+                >
                   Cancel
                 </button>
-                <button type="submit" className="bg-blue-600 hover:bg-blue-700 px-3 py-1 rounded">
+                <button
+                  type="submit"
+                  className="bg-blue-600 hover:bg-blue-700 px-3 py-1 rounded"
+                >
                   Save
                 </button>
               </div>

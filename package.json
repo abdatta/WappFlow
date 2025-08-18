@@ -10,21 +10,24 @@
     "admin:dev": "cd src/admin && npm install && npm run dev",
     "admin:build": "cd src/admin && npm install && npm run build",
     "vapid": "tsx src/cli/vapid.ts",
-    "playwright:install": "npx playwright install chromium"
+    "playwright:install": "npx playwright install chromium",
+    "prettify:check": "prettier --check .",
+    "prettify": "prettier --write ."
   },
   "dependencies": {
-    "playwright": "^1.42.0",
-    "express": "^4.18.2",
-    "web-push": "^3.6.0",
-    "zod": "^3.22.2",
+    "cors": "^2.8.5",
     "dotenv": "^10.0.0",
+    "express": "^4.18.2",
     "libphonenumber-js": "^1.9.48",
-    "cors": "^2.8.5"
+    "playwright": "^1.42.0",
+    "web-push": "^3.6.0",
+    "zod": "^3.22.2"
   },
   "devDependencies": {
-    "typescript": "^5.3.3",
+    "nodemon": "^3.0.1",
+    "prettier": "^3.6.2",
     "tsup": "^7.1.0",
     "tsx": "^3.12.7",
-    "nodemon": "^3.0.1"
+    "typescript": "^5.3.3"
   }
 }

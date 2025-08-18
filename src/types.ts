@@ -69,7 +69,10 @@ export interface ScheduleDto {
   active?: boolean;
 }
 
-export interface Schedule extends Required<Omit<ScheduleDto, 'firstRunAt' | 'intervalMinutes' | 'active'>> {
+export interface Schedule
+  extends Required<
+    Omit<ScheduleDto, "firstRunAt" | "intervalMinutes" | "active">
+  > {
   /** Unique identifier for the schedule. */
   id: string;
   /** ISO timestamp of the first execution. */
@@ -143,6 +146,6 @@ export interface LogEntry {
   ts: string;
   phone: string;
   textHash: string;
-  result: 'ok' | 'error';
+  result: "ok" | "error";
   error?: string;
 }

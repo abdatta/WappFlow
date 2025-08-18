@@ -6,8 +6,8 @@
  * overwritten.
  */
 
-import webPush from 'web-push';
-import { getSettings, saveSettings } from '../store.js';
+import webPush from "web-push";
+import { getSettings, saveSettings } from "../store.js";
 
 async function generate() {
   const keys = webPush.generateVAPIDKeys();
@@ -15,9 +15,9 @@ async function generate() {
   settings.vapid.publicKey = keys.publicKey;
   settings.vapid.privateKey = keys.privateKey;
   await saveSettings(settings);
-  console.log('\nGenerated new VAPID keys. Public key:\n');
+  console.log("\nGenerated new VAPID keys. Public key:\n");
   console.log(keys.publicKey);
-  console.log('\nUpdated data/settings.json with new keys.');
+  console.log("\nUpdated data/settings.json with new keys.");
 }
 generate().catch((err) => {
   console.error(err);

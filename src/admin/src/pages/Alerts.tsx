@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { fetchHealth } from '../lib/api';
+import React, { useEffect, useState } from "react";
+import { fetchHealth } from "../lib/api";
 
 interface AlertItem {
   ts: number;
@@ -24,8 +24,12 @@ export default function Alerts() {
         return;
       }
       if (health.session.ready !== lastReady) {
-        const message = health.session.ready ? 'Relinked / Ready' : 'QR required or offline';
-        setAlerts((prev) => [{ ts: Date.now(), message }, ...prev].slice(0, 20));
+        const message = health.session.ready
+          ? "Relinked / Ready"
+          : "QR required or offline";
+        setAlerts((prev) =>
+          [{ ts: Date.now(), message }, ...prev].slice(0, 20),
+        );
         setLastReady(health.session.ready);
       }
     } catch (err) {
