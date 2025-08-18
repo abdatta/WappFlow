@@ -53,7 +53,7 @@ export class WhatsAppDriver extends EventEmitter {
         headless,
         args: ["--start-maximized"],
         viewport: { width: 1280, height: 800 },
-      }
+      },
     ));
     const [page] = browser.pages();
     this.page = page;

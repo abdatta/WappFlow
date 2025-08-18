@@ -16,6 +16,7 @@ import { z } from "zod";
 import { RateLimiter } from "./rateLimiter.js";
 import { Scheduler } from "./scheduler.js";
 import { WhatsAppDriver } from "./driver.js";
+import { ContactsCache } from "./contacts.js";
 import {
   getSettings,
   saveSettings,
@@ -56,6 +57,10 @@ async function main() {
   // Initialise scheduler
   const scheduler = new Scheduler();
   await scheduler.init();
+  // Initialise contacts cache
+  const contacts = new ContactsCache();
+  await contacts.init();
+  setInterval(() => contacts.refresh(), 10 * 60 * 1000);
   // Provide scheduler with send function that wraps driver and rate limiter
   scheduler.start(async ({ phone, text, disablePrefix }) => {
     await handleSend(phone, text, disablePrefix);
@@ -86,6 +91,7 @@ async function main() {
     text: string,
     disablePrefix = false,
   ): Promise<void> {
+    contacts.setSending(true);
     // Validate phone
     let e164: string;
     try {
@@ -108,7 +114,7 @@ async function main() {
     const extraDelay = randomDelaySeconds(8, 25) * 1000;
     try {
       await driver.sendText(e164, body);
-      // Append log
+      await contacts.recordUsage(e164);
       await appendSendLog({
         ts: new Date().toISOString(),
         phone: e164,
@@ -124,8 +130,10 @@ async function main() {
         error: String(err),
       });
       throw err;
+    } finally {
+      await new Promise((resolve) => setTimeout(resolve, extraDelay));
+      contacts.setSending(false);
     }
-    await new Promise((resolve) => setTimeout(resolve, extraDelay));
   }
 
   /**
@@ -168,6 +176,19 @@ async function main() {
       const msg = err instanceof Error ? err.message : String(err);
       res.status(429).json({ error: msg });
     }
+  });
+
+  /**
+   * Contacts endpoints using the cached contacts list.
+   */
+  app.get("/api/contacts/top", (req, res) => {
+    const nParam = parseInt(String(req.query.n || ""), 10);
+    const n = nParam === 20 ? 20 : settings.topContactsN;
+    res.json({ contacts: contacts.getTop(n) });
+  });
+
+  app.get("/api/contacts/all", (req, res) => {
+    res.json({ contacts: contacts.getAll() });
   });
 
   /**

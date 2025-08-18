@@ -12,6 +12,7 @@ import {
   SubsFile,
   SessionState,
   SchedulesFile,
+  ContactsFile,
 } from "./types.js";
 
 const DATA_DIR = path.join(process.cwd(), "data");
@@ -69,6 +70,21 @@ export async function getSchedules(): Promise<SchedulesFile> {
 
 export async function saveSchedules(file: SchedulesFile): Promise<void> {
   await writeFileJson("schedules.json", file);
+}
+
+export async function getContacts(): Promise<ContactsFile> {
+  try {
+    return await readFileJson<ContactsFile>("contacts.json");
+  } catch (err: any) {
+    if (err.code === "ENOENT") {
+      return { contacts: [] };
+    }
+    throw err;
+  }
+}
+
+export async function saveContacts(file: ContactsFile): Promise<void> {
+  await writeFileJson("contacts.json", file);
 }
 
 /**

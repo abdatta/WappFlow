@@ -40,6 +40,7 @@ export interface Settings {
   rate: RateConfig;
   prefix: PrefixConfig;
   vapid: VapidConfig;
+  topContactsN: 10 | 20;
 }
 
 export interface Limits {
@@ -148,4 +149,14 @@ export interface LogEntry {
   textHash: string;
   result: "ok" | "error";
   error?: string;
+}
+
+export interface Contact {
+  name: string;
+  phone: string;
+  count: number;
+}
+
+export interface ContactsFile {
+  contacts: Contact[];
 }
