@@ -1,0 +1,19 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ES2022",
+    "moduleResolution": "Node",
+    "resolveJsonModule": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "strict": true,
+    "noImplicitAny": true,
+    "skipLibCheck": true,
+    "outDir": "dist",
+    "rootDir": "src",
+    "types": ["node"],
+    "useUnknownInCatchVariables": false
+  },
+  "include": ["src/**/*", "src/admin/src/**/*", "src/cli/**/*"],
+  "exclude": ["node_modules", "dist"]
+}

@@ -1,0 +1,30 @@
+{
+  "name": "whatsapp-bot",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "nodemon --watch src --ext ts,js --exec tsx src/server.ts",
+    "build": "tsup src/server.ts --format esm,cjs --out-dir dist --dts",
+    "start": "node dist/server.js",
+    "admin:dev": "cd src/admin && npm install && npm run dev",
+    "admin:build": "cd src/admin && npm install && npm run build",
+    "vapid": "tsx src/cli/vapid.ts",
+    "playwright:install": "npx playwright install chromium"
+  },
+  "dependencies": {
+    "playwright": "^1.42.0",
+    "express": "^4.18.2",
+    "web-push": "^3.6.0",
+    "zod": "^3.22.2",
+    "dotenv": "^10.0.0",
+    "libphonenumber-js": "^1.9.48",
+    "cors": "^2.8.5"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.3",
+    "tsup": "^7.1.0",
+    "tsx": "^3.12.7",
+    "nodemon": "^3.0.1"
+  }
+}
