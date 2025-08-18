@@ -1,6 +1,6 @@
-# WhatsApp Web Automation Bot
+# WappFlow - A WhatsApp Web Automation Bot
 
-This project implements a simple automation bot for WhatsApp Web. It provides a Node/TypeScript backend with an in‑process scheduler and a modern React/Tailwind admin interface. The bot can send text messages, schedule recurring sends and deliver web push notifications about session status.
+WappFlow implements a simple automation bot for WhatsApp Web. It provides a Node/TypeScript backend with an in‑process scheduler and a modern React/Tailwind admin interface. The bot can send text messages, schedule recurring sends and deliver web push notifications about session status.
 
 ## ⚠️ Terms of Service
 
@@ -15,6 +15,27 @@ Automating WhatsApp Web may violate WhatsApp’s Terms of Service. Use this proj
 - **In‑process scheduler**: supports one‑off and recurring jobs with at least 60 minute intervals.
 - **Web push notifications**: informs you when a QR relink is required, the session is relinked or your phone goes offline.
 - **React admin UI**: dark themed dashboard, send form, schedule management, alert feed and QR viewer.
+
+## 🚀 Quick Start
+
+```bash
+# 1. Clone & install
+git clone <your-repo-url> wappflow
+cd wappflow
+npm install
+
+# 2. Bootstrap runtime state
+npm run setup
+
+# 3. Install Playwright browser
+npm run playwright:install
+
+# 4. Run backend (serves admin UI on :3030)
+npm run dev
+```
+
+Then open http://localhost:5173/admin in your browser.
+Scan the QR code with WhatsApp to link your session.
 
 ## Getting started
 

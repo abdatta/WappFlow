@@ -28,8 +28,7 @@ export interface DriverEvents {
  * relink is required or when the phone goes offline.
  */
 export class WhatsAppDriver extends EventEmitter {
-  private browser: Browser | null = null;
-  private context: BrowserContext | null = null;
+  private browser: BrowserContext | null = null;
   private page: Page | null = null;
   private session: SessionState = { qr: null, ready: false, lastReadyAt: null };
   private settings: Settings;
@@ -48,12 +47,15 @@ export class WhatsAppDriver extends EventEmitter {
   async init(): Promise<void> {
     const headless = this.settings.headless;
     const userDataDir = path.join(process.cwd(), "profiles", "whatsapp");
-    this.browser = await chromium.launchPersistentContext(userDataDir, {
-      headless,
-      args: ["--start-maximized"],
-      viewport: { width: 1280, height: 800 },
-    });
-    const [page] = this.browser.pages();
+    const browser = (this.browser = await chromium.launchPersistentContext(
+      userDataDir,
+      {
+        headless,
+        args: ["--start-maximized"],
+        viewport: { width: 1280, height: 800 },
+      }
+    ));
+    const [page] = browser.pages();
     this.page = page;
     // Navigate to WhatsApp Web home page
     try {
@@ -126,7 +128,6 @@ export class WhatsAppDriver extends EventEmitter {
     if (this.browser) {
       await this.browser.close();
       this.browser = null;
-      this.context = null;
       this.page = null;
     }
   }
