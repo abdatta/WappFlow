@@ -58,9 +58,9 @@ async function main() {
   const scheduler = new Scheduler();
   await scheduler.init();
   // Initialise contacts cache
-  const contacts = new ContactsCache();
+  const contacts = new ContactsCache(driver);
   await contacts.init();
-  setInterval(() => contacts.refresh(), 10 * 60 * 1000);
+  setInterval(() => contacts.refreshFromWeb(), 6 * 60 * 60 * 1000);
   // Provide scheduler with send function that wraps driver and rate limiter
   scheduler.start(async ({ phone, text, disablePrefix }) => {
     await handleSend(phone, text, disablePrefix);
@@ -114,7 +114,6 @@ async function main() {
     const extraDelay = randomDelaySeconds(8, 25) * 1000;
     try {
       await driver.sendText(e164, body);
-      await contacts.recordUsage(e164);
       await appendSendLog({
         ts: new Date().toISOString(),
         phone: e164,

@@ -12,7 +12,7 @@
 import { chromium, Browser, BrowserContext, Page } from "playwright";
 import { EventEmitter } from "events";
 import path from "path";
-import { Settings, SessionState } from "./types.js";
+import { Settings, SessionState, Contact } from "./types.js";
 import { now, delay } from "./utils.js";
 
 export interface DriverEvents {
@@ -111,6 +111,35 @@ export class WhatsAppDriver extends EventEmitter {
     await this.page.keyboard.press("Enter");
     // Confirm bubble by waiting a bit
     await delay(1000);
+  }
+
+  /**
+   * Scrape the sidebar contact list and return contacts in the
+   * order WhatsApp presents them (most recent first). This stub
+   * implementation returns an empty array but demonstrates where
+   * scraping logic would live.
+   */
+  async fetchContacts(): Promise<Contact[]> {
+    if (!this.page) throw new Error("Driver not initialised");
+    await this.ensureReady();
+    try {
+      const contacts = await this.page.evaluate(() => {
+        const items: { name: string; phone: string }[] = [];
+        const rows = document.querySelectorAll("#pane-side div[role='row']");
+        rows.forEach((row) => {
+          const titleEl = row.querySelector("span[title]");
+          const name = titleEl ? titleEl.getAttribute("title") || "" : "";
+          // Phone numbers aren't exposed in the UI; in a real
+          // implementation you would resolve them via the Web API.
+          items.push({ name, phone: name });
+        });
+        return items;
+      });
+      return contacts;
+    } catch (err) {
+      this.emit("error", err);
+      return [];
+    }
   }
 
   /**

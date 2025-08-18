@@ -154,7 +154,6 @@ export interface LogEntry {
 export interface Contact {
   name: string;
   phone: string;
-  count: number;
 }
 
 export interface ContactsFile {
