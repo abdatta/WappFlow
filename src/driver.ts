@@ -53,7 +53,7 @@ export class WhatsAppDriver extends EventEmitter {
         headless,
         args: ["--start-maximized"],
         viewport: { width: 1280, height: 800 },
-      },
+      }
     ));
     const [page] = browser.pages();
     this.page = page;
@@ -125,7 +125,7 @@ export class WhatsAppDriver extends EventEmitter {
     await this.ensureReady();
     try {
       // Open the "New chat" dialog which contains the full contact list
-      const newChatBtn = "span[data-testid='chat']";
+      const newChatBtn = 'button[title="New chat"]';
       await this.page.click(newChatBtn);
       await this.page.waitForSelector("div[role='grid'] span[title]", {
         timeout: 15000,
@@ -141,7 +141,29 @@ export class WhatsAppDriver extends EventEmitter {
         "span[title]" + classNames.map((c) => `.${c}`).join("");
 
       // Scroll through the contact list to ensure all contacts are loaded.
-      const scrollSelector = "div[role='grid']";
+      const scrollSelector = await this.page.$eval(nameSelector, (element) => {
+        let parent: HTMLElement | null = element.parentElement;
+        while (parent) {
+          const style = window.getComputedStyle(parent);
+          const overflowY = style.overflowY;
+          const overflowX = style.overflowX;
+
+          const canScrollY =
+            (overflowY === "auto" || overflowY === "scroll") &&
+            parent.scrollHeight > parent.clientHeight;
+
+          const canScrollX =
+            (overflowX === "auto" || overflowX === "scroll") &&
+            parent.scrollWidth > parent.clientWidth;
+
+          if (canScrollY || canScrollX) {
+            return "div." + (Array.from(parent.classList) || []).join(".");
+          }
+
+          parent = parent.parentElement;
+        }
+        return "body";
+      });
       const seen = new Set<string>();
       const contacts: Contact[] = [];
 
@@ -149,16 +171,8 @@ export class WhatsAppDriver extends EventEmitter {
         const batch: Contact[] = await this.page.$$eval(nameSelector, (els) =>
           els.map((el) => {
             const name = (el as HTMLElement).getAttribute("title") || "";
-            let phone: string | undefined;
-            const row = el.closest("div[role='row']");
-            if (row) {
-              const testId = row.getAttribute("data-testid") || "";
-              const m = testId.match(/list-item-(\d+)(@c\.us)?/);
-              if (m) phone = m[1];
-            }
-            if (!phone && /^\+?\d+$/.test(name)) phone = name;
-            return { name, phone };
-          }),
+            return { name };
+          })
         );
 
         // Append new contacts preserving order
@@ -175,7 +189,7 @@ export class WhatsAppDriver extends EventEmitter {
             const { scrollTop, scrollHeight, clientHeight } = el as HTMLElement;
             if (scrollTop + clientHeight >= scrollHeight) return false;
             (el as HTMLElement).scrollBy(0, clientHeight);
-            return true;
+            return Math.round(el.scrollTop + el.clientHeight) < el.scrollHeight;
           })
           .catch(() => false);
         if (!scrolled) break;
@@ -183,7 +197,7 @@ export class WhatsAppDriver extends EventEmitter {
       }
 
       // Close the dialog
-      await this.page.keyboard.press("Escape");
+      await this.page.click('div[aria-label="Back"]');
 
       return contacts;
     } catch (err) {
@@ -198,7 +212,7 @@ export class WhatsAppDriver extends EventEmitter {
    */
   async sendTextToContact(
     contact: Contact,
-    text: string,
+    text: string
   ): Promise<string | undefined> {
     if (contact.phone) {
       await this.sendText(contact.phone, text);
