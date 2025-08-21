@@ -115,29 +115,47 @@ export class WhatsAppDriver extends EventEmitter {
 
   /**
    * Scrape the sidebar contact list and return contacts in the
-   * order WhatsApp presents them (most recent first). This stub
-   * implementation returns an empty array but demonstrates where
-   * scraping logic would live.
+   * order WhatsApp presents them (most recent first). The DOM
+   * structure of WhatsApp Web is highly dynamic, so this routine
+   * first discovers the runtime class names used for contact
+   * elements and then queries using that selector.
    */
   async fetchContacts(): Promise<Contact[]> {
     if (!this.page) throw new Error("Driver not initialised");
     await this.ensureReady();
     try {
-      const contacts = await this.page.evaluate(() => {
+      const searchSelector = "div[contenteditable='true'][data-tab='3']";
+      // Step 1/2: type "You" to ensure a predictable element then
+      // read its class list so we can build a stable selector.
+      await this.page.click(searchSelector);
+      await this.page.fill(searchSelector, "You");
+      const classNames = await this.page.evaluate(() => {
+        const el = document.querySelector("span[title]");
+        return el ? Array.from(el.classList) : [];
+      });
+      const nameSelector =
+        "span[title]" + classNames.map((c) => `.${c}`).join("");
+      // Step 4: clear the search box so the default top contacts
+      // list is visible again.
+      await this.page.fill(searchSelector, "");
+      // Step 5: query all contact name elements using the computed
+      // selector and extract names and phone numbers if present.
+      const contacts = await this.page.evaluate((sel) => {
         const items: { name: string; phone?: string }[] = [];
-        const rows = document.querySelectorAll("#pane-side div[role='row']");
-        rows.forEach((row) => {
-          const titleEl = row.querySelector("span[title]");
-          const name = titleEl ? titleEl.getAttribute("title") || "" : "";
+        document.querySelectorAll(sel).forEach((el) => {
+          const name = (el as HTMLElement).getAttribute("title") || "";
           let phone: string | undefined;
-          const testId = row.getAttribute("data-testid") || "";
-          const m = testId.match(/list-item-(\d+)(@c\.us)?/);
-          if (m) phone = m[1];
+          const row = el.closest("div[role='row']");
+          if (row) {
+            const testId = row.getAttribute("data-testid") || "";
+            const m = testId.match(/list-item-(\d+)(@c\.us)?/);
+            if (m) phone = m[1];
+          }
           if (!phone && /^\+?\d+$/.test(name)) phone = name;
           items.push({ name, phone });
         });
         return items;
-      });
+      }, nameSelector);
       return contacts as Contact[];
     } catch (err) {
       this.emit("error", err);
