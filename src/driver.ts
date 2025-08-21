@@ -124,39 +124,68 @@ export class WhatsAppDriver extends EventEmitter {
     if (!this.page) throw new Error("Driver not initialised");
     await this.ensureReady();
     try {
-      const searchSelector = "div[contenteditable='true'][data-tab='3']";
-      // Step 1/2: type "You" to ensure a predictable element then
-      // read its class list so we can build a stable selector.
-      await this.page.click(searchSelector);
-      await this.page.fill(searchSelector, "You");
+      // Open the "New chat" dialog which contains the full contact list
+      const newChatBtn = "span[data-testid='chat']";
+      await this.page.click(newChatBtn);
+      await this.page.waitForSelector("div[role='grid'] span[title]", {
+        timeout: 15000,
+      });
+
+      // Discover the runtime class names for contact title spans so we can
+      // build a stable selector regardless of obfuscation.
       const classNames = await this.page.evaluate(() => {
         const el = document.querySelector("span[title]");
         return el ? Array.from(el.classList) : [];
       });
       const nameSelector =
         "span[title]" + classNames.map((c) => `.${c}`).join("");
-      // Step 4: clear the search box so the default top contacts
-      // list is visible again.
-      await this.page.fill(searchSelector, "");
-      // Step 5: query all contact name elements using the computed
-      // selector and extract names and phone numbers if present.
-      const contacts = await this.page.evaluate((sel) => {
-        const items: { name: string; phone?: string }[] = [];
-        document.querySelectorAll(sel).forEach((el) => {
-          const name = (el as HTMLElement).getAttribute("title") || "";
-          let phone: string | undefined;
-          const row = el.closest("div[role='row']");
-          if (row) {
-            const testId = row.getAttribute("data-testid") || "";
-            const m = testId.match(/list-item-(\d+)(@c\.us)?/);
-            if (m) phone = m[1];
+
+      // Scroll through the contact list to ensure all contacts are loaded.
+      const scrollSelector = "div[role='grid']";
+      const seen = new Set<string>();
+      const contacts: Contact[] = [];
+
+      while (true) {
+        const batch: Contact[] = await this.page.$$eval(nameSelector, (els) =>
+          els.map((el) => {
+            const name = (el as HTMLElement).getAttribute("title") || "";
+            let phone: string | undefined;
+            const row = el.closest("div[role='row']");
+            if (row) {
+              const testId = row.getAttribute("data-testid") || "";
+              const m = testId.match(/list-item-(\d+)(@c\.us)?/);
+              if (m) phone = m[1];
+            }
+            if (!phone && /^\+?\d+$/.test(name)) phone = name;
+            return { name, phone };
+          }),
+        );
+
+        // Append new contacts preserving order
+        for (const c of batch) {
+          if (!seen.has(c.name)) {
+            seen.add(c.name);
+            contacts.push(c);
           }
-          if (!phone && /^\+?\d+$/.test(name)) phone = name;
-          items.push({ name, phone });
-        });
-        return items;
-      }, nameSelector);
-      return contacts as Contact[];
+        }
+
+        // Attempt to scroll down; break when we've reached the end
+        const scrolled = await this.page
+          .$eval(scrollSelector, (el) => {
+            const { scrollTop, scrollHeight, clientHeight } = el as HTMLElement;
+            if (scrollTop + clientHeight >= scrollHeight) return false;
+            (el as HTMLElement).scrollBy(0, clientHeight);
+            return true;
+          })
+          .catch(() => false);
+        if (!scrolled) break;
+        await this.page.waitForTimeout(500);
+      }
+
+      // Close the dialog
+      await this.page.keyboard.press("Escape");
+
+      return contacts;
     } catch (err) {
       this.emit("error", err);
       return [];
