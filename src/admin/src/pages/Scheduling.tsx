@@ -41,8 +41,11 @@ export default function Scheduling() {
   const [showAll, setShowAll] = useState(false);
   const [edit, setEdit] = useState<{
     id: string;
-    intervalMinutes: string | number;
+    text: string;
+    disablePrefix: boolean;
     firstRunAt: string;
+    intervalMinutes: string | number;
+    active: boolean;
   } | null>(null);
   const [status, setStatus] = useState<string | null>(null);
 
@@ -129,7 +132,11 @@ export default function Scheduling() {
   async function handleUpdate(e: React.FormEvent) {
     e.preventDefault();
     if (!edit) return;
-    const payload: any = {};
+    const payload: any = {
+      text: edit.text,
+      disablePrefix: edit.disablePrefix,
+      active: edit.active,
+    };
     if (edit.firstRunAt)
       payload.firstRunAt = new Date(edit.firstRunAt).toISOString();
     if (edit.intervalMinutes)
@@ -300,8 +307,11 @@ export default function Scheduling() {
                       onClick={() =>
                         setEdit({
                           id: s.id,
-                          intervalMinutes: s.intervalMinutes ?? "",
+                          text: s.text,
+                          disablePrefix: s.disablePrefix,
                           firstRunAt: s.firstRunAt,
+                          intervalMinutes: s.intervalMinutes ?? "",
+                          active: s.active,
                         })
                       }
                       className="bg-blue-600 hover:bg-blue-700 px-2 py-1 rounded"
@@ -349,6 +359,25 @@ export default function Scheduling() {
             <h3 className="text-lg font-medium">Edit Schedule</h3>
             <form onSubmit={handleUpdate} className="space-y-3">
               <div>
+                <label className="block mb-1">Message</label>
+                <textarea
+                  value={edit.text}
+                  onChange={(e) => setEdit({ ...edit, text: e.target.value })}
+                  className="w-full px-3 py-2 rounded bg-gray-700 text-white"
+                />
+              </div>
+              <div className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  checked={edit.disablePrefix}
+                  id="editDisablePrefix"
+                  onChange={(e) =>
+                    setEdit({ ...edit, disablePrefix: e.target.checked })
+                  }
+                />
+                <label htmlFor="editDisablePrefix">Disable prefix</label>
+              </div>
+              <div>
                 <label className="block mb-1">First run (local)</label>
                 <input
                   type="datetime-local"
@@ -371,6 +400,17 @@ export default function Scheduling() {
                   }
                   className="w-full px-3 py-2 rounded bg-gray-700 text-white"
                 />
+              </div>
+              <div className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  checked={edit.active}
+                  id="editActive"
+                  onChange={(e) =>
+                    setEdit({ ...edit, active: e.target.checked })
+                  }
+                />
+                <label htmlFor="editActive">Active</label>
               </div>
               <div className="flex justify-end space-x-2">
                 <button
