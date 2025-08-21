@@ -14,7 +14,8 @@ import type { Contact } from "../lib/types";
 
 interface Schedule {
   id: string;
-  phone: string;
+  phone?: string;
+  name?: string;
   text: string;
   disablePrefix: boolean;
   firstRunAt: string;
@@ -45,15 +46,17 @@ export default function Scheduling() {
   } | null>(null);
   const [status, setStatus] = useState<string | null>(null);
 
-  const suggestions = form.phone
-    ? allContacts.filter(
-        (c) =>
-          c.phone?.includes(form.phone) ||
-          c.name.toLowerCase().includes(form.phone.toLowerCase()),
-      )
-    : showAll
-      ? allContacts
-      : topContacts;
+  const suggestions = selected
+    ? []
+    : form.phone
+      ? allContacts.filter(
+          (c) =>
+            c.phone?.includes(form.phone) ||
+            c.name.toLowerCase().includes(form.phone.toLowerCase()),
+        )
+      : showAll
+        ? allContacts
+        : topContacts;
 
   useEffect(() => {
     refresh();
@@ -78,10 +81,14 @@ export default function Scheduling() {
         disablePrefix: form.disablePrefix,
         active: form.active,
       };
-      let phone = form.phone;
-      if (!phone && selected?.phone) phone = selected.phone;
-      if (!phone) throw new Error("Missing phone");
-      payload.phone = phone;
+      if (selected) {
+        if (selected.phone) payload.phone = selected.phone;
+        else payload.name = selected.name;
+      } else if (form.phone) {
+        payload.phone = form.phone;
+      } else {
+        throw new Error("Missing contact");
+      }
       if (form.firstRunAt)
         payload.firstRunAt = new Date(form.firstRunAt).toISOString();
       if (form.intervalMinutes)
@@ -159,7 +166,10 @@ export default function Scheduling() {
                     type="button"
                     onClick={() => {
                       setSelected(c);
-                      setForm({ ...form, phone: c.phone || "" });
+                      setForm({
+                        ...form,
+                        phone: c.phone ? `${c.name} (${c.phone})` : c.name,
+                      });
                     }}
                     className="block w-full text-left bg-gray-700 hover:bg-gray-600 p-2 rounded"
                   >
@@ -188,11 +198,6 @@ export default function Scheduling() {
                   View all
                 </button>
               )}
-            {selected && !form.phone && (
-              <p className="text-xs text-gray-400 mt-1">
-                Selected: {selected.name}
-              </p>
-            )}
           </div>
           <div>
             <label className="block mb-1">Message</label>
@@ -260,7 +265,7 @@ export default function Scheduling() {
           <table className="min-w-full text-left text-sm">
             <thead className="bg-gray-700">
               <tr>
-                <th className="px-3 py-2">Phone</th>
+                <th className="px-3 py-2">Contact</th>
                 <th className="px-3 py-2">Message</th>
                 <th className="px-3 py-2">Prefix</th>
                 <th className="px-3 py-2">Next Run</th>
@@ -272,7 +277,9 @@ export default function Scheduling() {
             <tbody>
               {schedules.map((s) => (
                 <tr key={s.id} className="odd:bg-gray-700">
-                  <td className="px-3 py-2 whitespace-nowrap">{s.phone}</td>
+                  <td className="px-3 py-2 whitespace-nowrap">
+                    {s.name || s.phone}
+                  </td>
                   <td className="px-3 py-2 whitespace-nowrap max-w-xs truncate">
                     {s.text}
                   </td>

@@ -17,23 +17,30 @@ export default function Send() {
     fetchAllContacts().then((res) => setAllContacts(res.contacts));
   }, []);
 
-  const suggestions = phone
-    ? allContacts.filter(
-        (c) =>
-          c.phone?.includes(phone) ||
-          c.name.toLowerCase().includes(phone.toLowerCase()),
-      )
-    : showAll
-      ? allContacts
-      : topContacts;
+  const suggestions = selected
+    ? []
+    : phone
+      ? allContacts.filter(
+          (c) =>
+            c.phone?.includes(phone) ||
+            c.name.toLowerCase().includes(phone.toLowerCase()),
+        )
+      : showAll
+        ? allContacts
+        : topContacts;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     try {
       const payload: any = { text, disablePrefix };
-      if (phone) payload.phone = phone;
-      else if (selected) payload.name = selected.name;
-      else throw new Error("Missing recipient");
+      if (selected) {
+        if (selected.phone) payload.phone = selected.phone;
+        else payload.name = selected.name;
+      } else if (phone) {
+        payload.phone = phone;
+      } else {
+        throw new Error("Missing recipient");
+      }
       await sendMessage(payload);
       setStatus("Message sent successfully");
       setPhone("");
@@ -69,7 +76,7 @@ export default function Send() {
                     type="button"
                     onClick={() => {
                       setSelected(c);
-                      setPhone(c.phone || "");
+                      setPhone(c.phone ? `${c.name} (${c.phone})` : c.name);
                     }}
                     className="block w-full text-left bg-gray-700 hover:bg-gray-600 p-2 rounded"
                   >
@@ -95,11 +102,6 @@ export default function Send() {
               >
                 View all
               </button>
-            )}
-            {selected && !phone && (
-              <p className="text-xs text-gray-400 mt-1">
-                Selected: {selected.name}
-              </p>
             )}
           </div>
           <div>

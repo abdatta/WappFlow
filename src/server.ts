@@ -62,8 +62,8 @@ async function main() {
   await contacts.init();
   setInterval(() => contacts.refreshFromWeb(), 6 * 60 * 60 * 1000);
   // Provide scheduler with send function that wraps driver and rate limiter
-  scheduler.start(async ({ phone, text, disablePrefix }) => {
-    await handleSend({ phone }, text, disablePrefix);
+  scheduler.start(async ({ phone, name, text, disablePrefix }) => {
+    await handleSend({ phone, name }, text, disablePrefix);
   });
 
   const app = express();
@@ -262,15 +262,21 @@ async function main() {
    * Create schedule.
    */
   app.post("/api/schedules", async (req, res) => {
-    const schema = z.object({
-      phone: z.string(),
-      text: z.string(),
-      disablePrefix: z.boolean().optional(),
-      // firstRunAt is an ISO string; we don't validate the format strictly here
-      firstRunAt: z.string().optional(),
-      intervalMinutes: z.number().nullable().optional(),
-      active: z.boolean().optional(),
-    });
+    const schema = z
+      .object({
+        phone: z.string().optional(),
+        name: z.string().optional(),
+        text: z.string(),
+        disablePrefix: z.boolean().optional(),
+        // firstRunAt is an ISO string; we don't validate the format strictly here
+        firstRunAt: z.string().optional(),
+        intervalMinutes: z.number().nullable().optional(),
+        active: z.boolean().optional(),
+      })
+      .refine((data) => data.phone || data.name, {
+        message: "phone or name required",
+        path: ["phone"],
+      });
     const parsed = schema.safeParse(req.body);
     if (!parsed.success) {
       return res
@@ -311,6 +317,7 @@ async function main() {
     const id = req.params.id;
     const schema = z.object({
       phone: z.string().optional(),
+      name: z.string().optional(),
       text: z.string().optional(),
       disablePrefix: z.boolean().optional(),
       firstRunAt: z.string().optional(),
