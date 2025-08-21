@@ -167,10 +167,13 @@ export class WhatsAppDriver extends EventEmitter {
    * Send a text message to a contact by phone number if available,
    * otherwise fall back to searching by the contact's display name.
    */
-  async sendTextToContact(contact: Contact, text: string): Promise<void> {
+  async sendTextToContact(
+    contact: Contact,
+    text: string,
+  ): Promise<string | undefined> {
     if (contact.phone) {
       await this.sendText(contact.phone, text);
-      return;
+      return contact.phone;
     }
     if (!this.page) throw new Error("Driver not initialised");
     await this.ensureReady();
@@ -183,10 +186,22 @@ export class WhatsAppDriver extends EventEmitter {
     });
     await this.page.click(`span[title='${contact.name}']`);
     await this.page.waitForSelector(composerSelector, { timeout: 15000 });
+    const phone = await this.page.evaluate(() => {
+      const header = document.querySelector("header [data-testid]");
+      if (!header) return undefined;
+      const testId = header.getAttribute("data-testid") || "";
+      const m = testId.match(/(\d+)(@c\.us)?/);
+      if (m) return m[1];
+      const title = header.querySelector("span[title]") as HTMLElement | null;
+      const t = title?.getAttribute("title") || "";
+      if (/^\+?\d+$/.test(t)) return t;
+      return undefined;
+    });
     await delay(400 + Math.random() * 800);
     await this.page.keyboard.type(text);
     await this.page.keyboard.press("Enter");
     await delay(1000);
+    return phone || undefined;
   }
 
   /**

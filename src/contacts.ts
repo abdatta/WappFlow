@@ -49,4 +49,15 @@ export class ContactsCache {
   getAll(): Contact[] {
     return [...this.contacts];
   }
+
+  async upsert(contact: Contact): Promise<void> {
+    const idx = this.contacts.findIndex((c) => c.name === contact.name);
+    if (idx >= 0) {
+      this.contacts[idx] = { ...this.contacts[idx], ...contact };
+    } else {
+      this.contacts.push(contact);
+    }
+    const file: ContactsFile = { contacts: this.contacts };
+    await saveContacts(file);
+  }
 }

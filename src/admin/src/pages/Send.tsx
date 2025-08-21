@@ -10,7 +10,6 @@ export default function Send() {
   const [status, setStatus] = useState<string | null>(null);
   const [topContacts, setTopContacts] = useState<Contact[]>([]);
   const [allContacts, setAllContacts] = useState<Contact[]>([]);
-  const [search, setSearch] = useState("");
   const [showAll, setShowAll] = useState(false);
 
   useEffect(() => {
@@ -18,13 +17,15 @@ export default function Send() {
     fetchAllContacts().then((res) => setAllContacts(res.contacts));
   }, []);
 
-  const filtered = search
+  const suggestions = phone
     ? allContacts.filter(
         (c) =>
-          c.phone?.includes(search) ||
-          c.name.toLowerCase().includes(search.toLowerCase()),
+          c.phone?.includes(phone) ||
+          c.name.toLowerCase().includes(phone.toLowerCase()),
       )
-    : [];
+    : showAll
+      ? allContacts
+      : topContacts;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -47,108 +48,54 @@ export default function Send() {
     <div className="space-y-6">
       <h1 className="text-2xl font-bold">Send Message</h1>
       <div className="bg-gray-800 p-4 rounded-lg space-y-4 max-w-md">
-        <div>
-          <h2 className="text-lg font-semibold mb-2">Top contacts</h2>
-          {topContacts.length === 0 ? (
-            <p className="text-sm text-gray-400">
-              No contacts yet. Add or import contacts to get started.
-            </p>
-          ) : (
-            <div className="grid grid-cols-2 gap-2">
-              {topContacts.map((c) => (
-                <button
-                  key={c.phone || c.name}
-                  type="button"
-                  onClick={() => {
-                    setSelected(c);
-                    setPhone(c.phone || "");
-                  }}
-                  className="bg-gray-700 hover:bg-gray-600 p-2 rounded text-left"
-                >
-                  <div className="font-medium">{c.name || c.phone}</div>
-                  {c.phone && (
-                    <div className="text-xs text-gray-400">{c.phone}</div>
-                  )}
-                </button>
-              ))}
-            </div>
-          )}
-          {allContacts.length > topContacts.length && (
-            <button
-              type="button"
-              onClick={() => setShowAll(!showAll)}
-              className="text-blue-400 text-sm mt-2"
-            >
-              View all
-            </button>
-          )}
-          {showAll && (
-            <div className="mt-2 max-h-48 overflow-y-auto space-y-2">
-              {allContacts.map((c) => (
-                <button
-                  key={c.phone || c.name}
-                  type="button"
-                  onClick={() => {
-                    setSelected(c);
-                    setPhone(c.phone || "");
-                    setShowAll(false);
-                  }}
-                  className="block w-full text-left bg-gray-700 hover:bg-gray-600 p-2 rounded"
-                >
-                  <div className="font-medium">{c.name || c.phone}</div>
-                  {c.phone && (
-                    <div className="text-xs text-gray-400">{c.phone}</div>
-                  )}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-        <div>
-          <label className="block mb-1">Search contacts</label>
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full px-3 py-2 rounded bg-gray-700 text-white"
-          />
-          {search && (
-            <div className="mt-2 max-h-40 overflow-auto space-y-2">
-              {filtered.map((c) => (
-                <button
-                  key={c.phone || c.name}
-                  type="button"
-                  onClick={() => {
-                    setSelected(c);
-                    setPhone(c.phone || "");
-                    setSearch("");
-                  }}
-                  className="block w-full text-left bg-gray-700 hover:bg-gray-600 p-2 rounded"
-                >
-                  <div className="font-medium">{c.name || c.phone}</div>
-                  {c.phone && (
-                    <div className="text-xs text-gray-400">{c.phone}</div>
-                  )}
-                </button>
-              ))}
-              {filtered.length === 0 && (
-                <p className="text-sm text-gray-400">No contacts found</p>
-              )}
-            </div>
-          )}
-        </div>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block mb-1">Phone (E.164)</label>
+            <label className="block mb-1">Contact</label>
             <input
               type="text"
               value={phone}
               onChange={(e) => {
                 setPhone(e.target.value);
                 setSelected(null);
+                if (e.target.value) setShowAll(false);
               }}
               className="w-full px-3 py-2 rounded bg-gray-700 text-white"
             />
+            {suggestions.length > 0 ? (
+              <div className="mt-2 max-h-48 overflow-y-auto space-y-2">
+                {suggestions.map((c) => (
+                  <button
+                    key={c.phone || c.name}
+                    type="button"
+                    onClick={() => {
+                      setSelected(c);
+                      setPhone(c.phone || "");
+                    }}
+                    className="block w-full text-left bg-gray-700 hover:bg-gray-600 p-2 rounded"
+                  >
+                    <div className="font-medium">{c.name}</div>
+                    {c.phone && (
+                      <div className="text-xs text-gray-400">{c.phone}</div>
+                    )}
+                  </button>
+                ))}
+              </div>
+            ) : (
+              !phone && (
+                <p className="text-sm text-gray-400 mt-2">
+                  No contacts yet. Add or import contacts to get started.
+                </p>
+              )
+            )}
+            {!phone && !showAll && allContacts.length > topContacts.length && (
+              <button
+                type="button"
+                onClick={() => setShowAll(true)}
+                className="text-blue-400 text-sm mt-2"
+              >
+                View all
+              </button>
+            )}
             {selected && !phone && (
               <p className="text-xs text-gray-400 mt-1">
                 Selected: {selected.name}

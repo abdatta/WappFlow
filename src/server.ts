@@ -124,9 +124,16 @@ async function main() {
           result: "ok",
         });
       } else if (target.name) {
-        await driver.sendTextToContact({ name: target.name }, body);
+        const resolvedPhone = await driver.sendTextToContact(
+          { name: target.name },
+          body,
+        );
+        if (resolvedPhone) {
+          await contacts.upsert({ name: target.name, phone: resolvedPhone });
+        }
         await appendSendLog({
           ts: new Date().toISOString(),
+          phone: resolvedPhone,
           name: target.name,
           textHash: hashText(text),
           result: "ok",
