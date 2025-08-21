@@ -124,22 +124,51 @@ export class WhatsAppDriver extends EventEmitter {
     await this.ensureReady();
     try {
       const contacts = await this.page.evaluate(() => {
-        const items: { name: string; phone: string }[] = [];
+        const items: { name: string; phone?: string }[] = [];
         const rows = document.querySelectorAll("#pane-side div[role='row']");
         rows.forEach((row) => {
           const titleEl = row.querySelector("span[title]");
           const name = titleEl ? titleEl.getAttribute("title") || "" : "";
-          // Phone numbers aren't exposed in the UI; in a real
-          // implementation you would resolve them via the Web API.
-          items.push({ name, phone: name });
+          let phone: string | undefined;
+          const testId = row.getAttribute("data-testid") || "";
+          const m = testId.match(/list-item-(\d+)(@c\.us)?/);
+          if (m) phone = m[1];
+          if (!phone && /^\+?\d+$/.test(name)) phone = name;
+          items.push({ name, phone });
         });
         return items;
       });
-      return contacts;
+      return contacts as Contact[];
     } catch (err) {
       this.emit("error", err);
       return [];
     }
+  }
+
+  /**
+   * Send a text message to a contact by phone number if available,
+   * otherwise fall back to searching by the contact's display name.
+   */
+  async sendTextToContact(contact: Contact, text: string): Promise<void> {
+    if (contact.phone) {
+      await this.sendText(contact.phone, text);
+      return;
+    }
+    if (!this.page) throw new Error("Driver not initialised");
+    await this.ensureReady();
+    const searchSelector = "div[contenteditable='true'][data-tab='3']";
+    const composerSelector = "div[contenteditable='true'][data-tab]";
+    await this.page.click(searchSelector);
+    await this.page.fill(searchSelector, contact.name);
+    await this.page.waitForSelector(`span[title='${contact.name}']`, {
+      timeout: 15000,
+    });
+    await this.page.click(`span[title='${contact.name}']`);
+    await this.page.waitForSelector(composerSelector, { timeout: 15000 });
+    await delay(400 + Math.random() * 800);
+    await this.page.keyboard.type(text);
+    await this.page.keyboard.press("Enter");
+    await delay(1000);
   }
 
   /**

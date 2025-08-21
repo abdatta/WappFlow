@@ -4,6 +4,7 @@ import type { Contact } from "../lib/types";
 
 export default function Send() {
   const [phone, setPhone] = useState("");
+  const [selected, setSelected] = useState<Contact | null>(null);
   const [text, setText] = useState("");
   const [disablePrefix, setDisablePrefix] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
@@ -20,7 +21,7 @@ export default function Send() {
   const filtered = search
     ? allContacts.filter(
         (c) =>
-          c.phone.includes(search) ||
+          c.phone?.includes(search) ||
           c.name.toLowerCase().includes(search.toLowerCase()),
       )
     : [];
@@ -28,9 +29,14 @@ export default function Send() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     try {
-      await sendMessage({ phone, text, disablePrefix });
+      const payload: any = { text, disablePrefix };
+      if (phone) payload.phone = phone;
+      else if (selected) payload.name = selected.name;
+      else throw new Error("Missing recipient");
+      await sendMessage(payload);
       setStatus("Message sent successfully");
       setPhone("");
+      setSelected(null);
       setText("");
     } catch (err: any) {
       setStatus(err.response?.data?.error || "Failed to send");
@@ -51,13 +57,18 @@ export default function Send() {
             <div className="grid grid-cols-2 gap-2">
               {topContacts.map((c) => (
                 <button
-                  key={c.phone}
+                  key={c.phone || c.name}
                   type="button"
-                  onClick={() => setPhone(c.phone)}
+                  onClick={() => {
+                    setSelected(c);
+                    setPhone(c.phone || "");
+                  }}
                   className="bg-gray-700 hover:bg-gray-600 p-2 rounded text-left"
                 >
                   <div className="font-medium">{c.name || c.phone}</div>
-                  <div className="text-xs text-gray-400">{c.phone}</div>
+                  {c.phone && (
+                    <div className="text-xs text-gray-400">{c.phone}</div>
+                  )}
                 </button>
               ))}
             </div>
@@ -75,16 +86,19 @@ export default function Send() {
             <div className="mt-2 max-h-48 overflow-y-auto space-y-2">
               {allContacts.map((c) => (
                 <button
-                  key={c.phone}
+                  key={c.phone || c.name}
                   type="button"
                   onClick={() => {
-                    setPhone(c.phone);
+                    setSelected(c);
+                    setPhone(c.phone || "");
                     setShowAll(false);
                   }}
                   className="block w-full text-left bg-gray-700 hover:bg-gray-600 p-2 rounded"
                 >
                   <div className="font-medium">{c.name || c.phone}</div>
-                  <div className="text-xs text-gray-400">{c.phone}</div>
+                  {c.phone && (
+                    <div className="text-xs text-gray-400">{c.phone}</div>
+                  )}
                 </button>
               ))}
             </div>
@@ -102,16 +116,19 @@ export default function Send() {
             <div className="mt-2 max-h-40 overflow-auto space-y-2">
               {filtered.map((c) => (
                 <button
-                  key={c.phone}
+                  key={c.phone || c.name}
                   type="button"
                   onClick={() => {
-                    setPhone(c.phone);
+                    setSelected(c);
+                    setPhone(c.phone || "");
                     setSearch("");
                   }}
                   className="block w-full text-left bg-gray-700 hover:bg-gray-600 p-2 rounded"
                 >
                   <div className="font-medium">{c.name || c.phone}</div>
-                  <div className="text-xs text-gray-400">{c.phone}</div>
+                  {c.phone && (
+                    <div className="text-xs text-gray-400">{c.phone}</div>
+                  )}
                 </button>
               ))}
               {filtered.length === 0 && (
@@ -126,9 +143,17 @@ export default function Send() {
             <input
               type="text"
               value={phone}
-              onChange={(e) => setPhone(e.target.value)}
+              onChange={(e) => {
+                setPhone(e.target.value);
+                setSelected(null);
+              }}
               className="w-full px-3 py-2 rounded bg-gray-700 text-white"
             />
+            {selected && !phone && (
+              <p className="text-xs text-gray-400 mt-1">
+                Selected: {selected.name}
+              </p>
+            )}
           </div>
           <div>
             <label className="block mb-1">Message</label>

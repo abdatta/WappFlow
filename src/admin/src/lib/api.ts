@@ -30,7 +30,8 @@ export async function fetchHealth() {
 }
 
 export async function sendMessage(data: {
-  phone: string;
+  phone?: string;
+  name?: string;
   text: string;
   disablePrefix?: boolean;
 }) {

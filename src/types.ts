@@ -55,7 +55,8 @@ export interface Limits {
 }
 
 export interface SendRequestDto {
-  phone: string;
+  phone?: string;
+  name?: string;
   text: string;
   disablePrefix?: boolean;
   idempotencyKey?: string;
@@ -153,7 +154,7 @@ export interface LogEntry {
 
 export interface Contact {
   name: string;
-  phone: string;
+  phone?: string;
 }
 
 export interface ContactsFile {
