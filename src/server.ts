@@ -16,6 +16,7 @@ import { z } from "zod";
 import { RateLimiter } from "./rateLimiter.js";
 import { Scheduler } from "./scheduler.js";
 import { WhatsAppDriver } from "./driver.js";
+import { ContactsCache } from "./contacts.js";
 import {
   getSettings,
   saveSettings,
@@ -56,9 +57,13 @@ async function main() {
   // Initialise scheduler
   const scheduler = new Scheduler();
   await scheduler.init();
+  // Initialise contacts cache
+  const contacts = new ContactsCache(driver);
+  await contacts.init();
+  setInterval(() => contacts.refreshFromWeb(), 6 * 60 * 60 * 1000);
   // Provide scheduler with send function that wraps driver and rate limiter
-  scheduler.start(async ({ phone, text, disablePrefix }) => {
-    await handleSend(phone, text, disablePrefix);
+  scheduler.start(async ({ phone, name, text, disablePrefix }) => {
+    await handleSend({ phone, name }, text, disablePrefix);
   });
 
   const app = express();
@@ -82,16 +87,19 @@ async function main() {
    * calls the driver. Logs the attempt to sends.log.jsonl.
    */
   async function handleSend(
-    phone: string,
+    target: { phone?: string; name?: string },
     text: string,
     disablePrefix = false,
   ): Promise<void> {
-    // Validate phone
-    let e164: string;
-    try {
-      e164 = validatePhone(phone);
-    } catch (err) {
-      throw new Error("INVALID_PHONE");
+    contacts.setSending(true);
+    // Validate phone if provided
+    let e164: string | undefined;
+    if (target.phone) {
+      try {
+        e164 = validatePhone(target.phone);
+      } catch (err) {
+        throw new Error("INVALID_PHONE");
+      }
     }
     // Prepend prefix if enabled globally and not disabled per message
     const currentSettings = await getSettings();
@@ -107,25 +115,46 @@ async function main() {
     // Random extra delay after each send
     const extraDelay = randomDelaySeconds(8, 25) * 1000;
     try {
-      await driver.sendText(e164, body);
-      // Append log
-      await appendSendLog({
-        ts: new Date().toISOString(),
-        phone: e164,
-        textHash: hashText(text),
-        result: "ok",
-      });
+      if (e164) {
+        await driver.sendText(e164, body);
+        await appendSendLog({
+          ts: new Date().toISOString(),
+          phone: e164,
+          textHash: hashText(text),
+          result: "ok",
+        });
+      } else if (target.name) {
+        const resolvedPhone = await driver.sendTextToContact(
+          { name: target.name },
+          body,
+        );
+        if (resolvedPhone) {
+          await contacts.upsert({ name: target.name, phone: resolvedPhone });
+        }
+        await appendSendLog({
+          ts: new Date().toISOString(),
+          phone: resolvedPhone,
+          name: target.name,
+          textHash: hashText(text),
+          result: "ok",
+        });
+      } else {
+        throw new Error("NO_TARGET");
+      }
     } catch (err) {
       await appendSendLog({
         ts: new Date().toISOString(),
         phone: e164,
+        name: target.name,
         textHash: hashText(text),
         result: "error",
         error: String(err),
       });
       throw err;
+    } finally {
+      await new Promise((resolve) => setTimeout(resolve, extraDelay));
+      contacts.setSending(false);
     }
-    await new Promise((resolve) => setTimeout(resolve, extraDelay));
   }
 
   /**
@@ -148,26 +177,45 @@ async function main() {
    * Send API: send a single message. Expects JSON body with phone and text.
    */
   app.post("/api/send", async (req, res) => {
-    const schema = z.object({
-      phone: z.string(),
-      text: z.string(),
-      disablePrefix: z.boolean().optional(),
-      idempotencyKey: z.string().optional(),
-    });
+    const schema = z
+      .object({
+        phone: z.string().optional(),
+        name: z.string().optional(),
+        text: z.string(),
+        disablePrefix: z.boolean().optional(),
+        idempotencyKey: z.string().optional(),
+      })
+      .refine((d) => d.phone || d.name, {
+        message: "phone or name required",
+        path: ["phone"],
+      });
     const parsed = schema.safeParse(req.body);
     if (!parsed.success) {
       return res
         .status(400)
         .json({ error: "Invalid payload", details: parsed.error.flatten() });
     }
-    const { phone, text, disablePrefix } = parsed.data;
+    const { phone, name, text, disablePrefix } = parsed.data;
     try {
-      await handleSend(phone, text, disablePrefix);
+      await handleSend({ phone, name }, text, disablePrefix);
       res.json({ ok: true, id: uuid() });
     } catch (err: any) {
       const msg = err instanceof Error ? err.message : String(err);
       res.status(429).json({ error: msg });
     }
+  });
+
+  /**
+   * Contacts endpoints using the cached contacts list.
+   */
+  app.get("/api/contacts/top", (req, res) => {
+    const nParam = parseInt(String(req.query.n || ""), 10);
+    const n = nParam === 20 ? 20 : settings.topContactsN;
+    res.json({ contacts: contacts.getTop(n) });
+  });
+
+  app.get("/api/contacts/all", (req, res) => {
+    res.json({ contacts: contacts.getAll() });
   });
 
   /**
@@ -214,15 +262,21 @@ async function main() {
    * Create schedule.
    */
   app.post("/api/schedules", async (req, res) => {
-    const schema = z.object({
-      phone: z.string(),
-      text: z.string(),
-      disablePrefix: z.boolean().optional(),
-      // firstRunAt is an ISO string; we don't validate the format strictly here
-      firstRunAt: z.string().optional(),
-      intervalMinutes: z.number().nullable().optional(),
-      active: z.boolean().optional(),
-    });
+    const schema = z
+      .object({
+        phone: z.string().optional(),
+        name: z.string().optional(),
+        text: z.string(),
+        disablePrefix: z.boolean().optional(),
+        // firstRunAt is an ISO string; we don't validate the format strictly here
+        firstRunAt: z.string().optional(),
+        intervalMinutes: z.number().nullable().optional(),
+        active: z.boolean().optional(),
+      })
+      .refine((data) => data.phone || data.name, {
+        message: "phone or name required",
+        path: ["phone"],
+      });
     const parsed = schema.safeParse(req.body);
     if (!parsed.success) {
       return res
@@ -263,6 +317,7 @@ async function main() {
     const id = req.params.id;
     const schema = z.object({
       phone: z.string().optional(),
+      name: z.string().optional(),
       text: z.string().optional(),
       disablePrefix: z.boolean().optional(),
       firstRunAt: z.string().optional(),

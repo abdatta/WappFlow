@@ -7,11 +7,15 @@ import {
   pauseSchedule,
   resumeSchedule,
   updateSchedule,
+  fetchTopContacts,
+  fetchAllContacts,
 } from "../lib/api";
+import type { Contact } from "../lib/types";
 
 interface Schedule {
   id: string;
-  phone: string;
+  phone?: string;
+  name?: string;
   text: string;
   disablePrefix: boolean;
   firstRunAt: string;
@@ -31,15 +35,36 @@ export default function Scheduling() {
     intervalMinutes: "" as string | number,
     active: true,
   });
+  const [selected, setSelected] = useState<Contact | null>(null);
+  const [topContacts, setTopContacts] = useState<Contact[]>([]);
+  const [allContacts, setAllContacts] = useState<Contact[]>([]);
+  const [showAll, setShowAll] = useState(false);
   const [edit, setEdit] = useState<{
     id: string;
-    intervalMinutes: string | number;
+    text: string;
+    disablePrefix: boolean;
     firstRunAt: string;
+    intervalMinutes: string | number;
+    active: boolean;
   } | null>(null);
   const [status, setStatus] = useState<string | null>(null);
 
+  const suggestions = selected
+    ? []
+    : form.phone
+      ? allContacts.filter(
+          (c) =>
+            c.phone?.includes(form.phone) ||
+            c.name.toLowerCase().includes(form.phone.toLowerCase()),
+        )
+      : showAll
+        ? allContacts
+        : topContacts;
+
   useEffect(() => {
     refresh();
+    fetchTopContacts().then((res) => setTopContacts(res.contacts));
+    fetchAllContacts().then((res) => setAllContacts(res.contacts));
   }, []);
 
   async function refresh() {
@@ -55,11 +80,18 @@ export default function Scheduling() {
     e.preventDefault();
     try {
       const payload: any = {
-        phone: form.phone,
         text: form.text,
         disablePrefix: form.disablePrefix,
         active: form.active,
       };
+      if (selected) {
+        if (selected.phone) payload.phone = selected.phone;
+        else payload.name = selected.name;
+      } else if (form.phone) {
+        payload.phone = form.phone;
+      } else {
+        throw new Error("Missing contact");
+      }
       if (form.firstRunAt)
         payload.firstRunAt = new Date(form.firstRunAt).toISOString();
       if (form.intervalMinutes)
@@ -74,9 +106,10 @@ export default function Scheduling() {
         intervalMinutes: "",
         active: true,
       });
+      setSelected(null);
       refresh();
     } catch (err: any) {
-      setStatus(err.response?.data?.error || "Error creating");
+      setStatus(err.response?.data?.error || err.message || "Error creating");
     }
   }
 
@@ -99,7 +132,11 @@ export default function Scheduling() {
   async function handleUpdate(e: React.FormEvent) {
     e.preventDefault();
     if (!edit) return;
-    const payload: any = {};
+    const payload: any = {
+      text: edit.text,
+      disablePrefix: edit.disablePrefix,
+      active: edit.active,
+    };
     if (edit.firstRunAt)
       payload.firstRunAt = new Date(edit.firstRunAt).toISOString();
     if (edit.intervalMinutes)
@@ -117,13 +154,57 @@ export default function Scheduling() {
         <h2 className="text-lg font-medium">Create Schedule</h2>
         <form onSubmit={handleCreate} className="space-y-3">
           <div>
-            <label className="block mb-1">Phone</label>
+            <label className="block mb-1">Contact</label>
             <input
               type="text"
               value={form.phone}
-              onChange={(e) => setForm({ ...form, phone: e.target.value })}
+              onChange={(e) => {
+                setForm({ ...form, phone: e.target.value });
+                setSelected(null);
+                if (e.target.value) setShowAll(false);
+              }}
               className="w-full px-3 py-2 rounded bg-gray-700 text-white"
             />
+            {suggestions.length > 0 ? (
+              <div className="mt-2 max-h-48 overflow-y-auto space-y-2">
+                {suggestions.map((c) => (
+                  <button
+                    key={c.phone || c.name}
+                    type="button"
+                    onClick={() => {
+                      setSelected(c);
+                      setForm({
+                        ...form,
+                        phone: c.phone ? `${c.name} (${c.phone})` : c.name,
+                      });
+                    }}
+                    className="block w-full text-left bg-gray-700 hover:bg-gray-600 p-2 rounded"
+                  >
+                    <div className="font-medium">{c.name}</div>
+                    {c.phone && (
+                      <div className="text-xs text-gray-400">{c.phone}</div>
+                    )}
+                  </button>
+                ))}
+              </div>
+            ) : (
+              !form.phone && (
+                <p className="text-sm text-gray-400 mt-2">
+                  No contacts yet. Add or import contacts to get started.
+                </p>
+              )
+            )}
+            {!form.phone &&
+              !showAll &&
+              allContacts.length > topContacts.length && (
+                <button
+                  type="button"
+                  onClick={() => setShowAll(true)}
+                  className="text-blue-400 text-sm mt-2"
+                >
+                  View all
+                </button>
+              )}
           </div>
           <div>
             <label className="block mb-1">Message</label>
@@ -191,7 +272,9 @@ export default function Scheduling() {
           <table className="min-w-full text-left text-sm">
             <thead className="bg-gray-700">
               <tr>
-                <th className="px-3 py-2">Phone</th>
+                <th className="px-3 py-2">Contact</th>
+                <th className="px-3 py-2">Message</th>
+                <th className="px-3 py-2">Prefix</th>
                 <th className="px-3 py-2">Next Run</th>
                 <th className="px-3 py-2">Interval</th>
                 <th className="px-3 py-2">Active</th>
@@ -201,7 +284,15 @@ export default function Scheduling() {
             <tbody>
               {schedules.map((s) => (
                 <tr key={s.id} className="odd:bg-gray-700">
-                  <td className="px-3 py-2 whitespace-nowrap">{s.phone}</td>
+                  <td className="px-3 py-2 whitespace-nowrap">
+                    {s.name || s.phone}
+                  </td>
+                  <td className="px-3 py-2 whitespace-nowrap max-w-xs truncate">
+                    {s.text}
+                  </td>
+                  <td className="px-3 py-2 whitespace-nowrap">
+                    {s.disablePrefix ? "Off" : "On"}
+                  </td>
                   <td className="px-3 py-2 whitespace-nowrap">
                     {new Date(s.nextRunAt).toLocaleString()}
                   </td>
@@ -216,8 +307,11 @@ export default function Scheduling() {
                       onClick={() =>
                         setEdit({
                           id: s.id,
-                          intervalMinutes: s.intervalMinutes ?? "",
+                          text: s.text,
+                          disablePrefix: s.disablePrefix,
                           firstRunAt: s.firstRunAt,
+                          intervalMinutes: s.intervalMinutes ?? "",
+                          active: s.active,
                         })
                       }
                       className="bg-blue-600 hover:bg-blue-700 px-2 py-1 rounded"
@@ -265,6 +359,25 @@ export default function Scheduling() {
             <h3 className="text-lg font-medium">Edit Schedule</h3>
             <form onSubmit={handleUpdate} className="space-y-3">
               <div>
+                <label className="block mb-1">Message</label>
+                <textarea
+                  value={edit.text}
+                  onChange={(e) => setEdit({ ...edit, text: e.target.value })}
+                  className="w-full px-3 py-2 rounded bg-gray-700 text-white"
+                />
+              </div>
+              <div className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  checked={edit.disablePrefix}
+                  id="editDisablePrefix"
+                  onChange={(e) =>
+                    setEdit({ ...edit, disablePrefix: e.target.checked })
+                  }
+                />
+                <label htmlFor="editDisablePrefix">Disable prefix</label>
+              </div>
+              <div>
                 <label className="block mb-1">First run (local)</label>
                 <input
                   type="datetime-local"
@@ -287,6 +400,17 @@ export default function Scheduling() {
                   }
                   className="w-full px-3 py-2 rounded bg-gray-700 text-white"
                 />
+              </div>
+              <div className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  checked={edit.active}
+                  id="editActive"
+                  onChange={(e) =>
+                    setEdit({ ...edit, active: e.target.checked })
+                  }
+                />
+                <label htmlFor="editActive">Active</label>
               </div>
               <div className="flex justify-end space-x-2">
                 <button

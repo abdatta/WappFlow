@@ -12,7 +12,7 @@
 import { chromium, Browser, BrowserContext, Page } from "playwright";
 import { EventEmitter } from "events";
 import path from "path";
-import { Settings, SessionState } from "./types.js";
+import { Settings, SessionState, Contact } from "./types.js";
 import { now, delay } from "./utils.js";
 
 export interface DriverEvents {
@@ -111,6 +111,140 @@ export class WhatsAppDriver extends EventEmitter {
     await this.page.keyboard.press("Enter");
     // Confirm bubble by waiting a bit
     await delay(1000);
+  }
+
+  /**
+   * Scrape the sidebar contact list and return contacts in the
+   * order WhatsApp presents them (most recent first). The DOM
+   * structure of WhatsApp Web is highly dynamic, so this routine
+   * first discovers the runtime class names used for contact
+   * elements and then queries using that selector.
+   */
+  async fetchContacts(): Promise<Contact[]> {
+    if (!this.page) throw new Error("Driver not initialised");
+    await this.ensureReady();
+    try {
+      // Open the "New chat" dialog which contains the full contact list
+      const newChatBtn = 'button[title="New chat"]';
+      await this.page.click(newChatBtn);
+      await this.page.waitForSelector("div[role='grid'] span[title]", {
+        timeout: 15000,
+      });
+
+      // Discover the runtime class names for contact title spans so we can
+      // build a stable selector regardless of obfuscation.
+      const classNames = await this.page.evaluate(() => {
+        const el = document.querySelector("span[title]");
+        return el ? Array.from(el.classList) : [];
+      });
+      const nameSelector =
+        "span[title]" + classNames.map((c) => `.${c}`).join("");
+
+      // Scroll through the contact list to ensure all contacts are loaded.
+      const scrollSelector = await this.page.$eval(nameSelector, (element) => {
+        let parent: HTMLElement | null = element.parentElement;
+        while (parent) {
+          const style = window.getComputedStyle(parent);
+          const overflowY = style.overflowY;
+          const overflowX = style.overflowX;
+
+          const canScrollY =
+            (overflowY === "auto" || overflowY === "scroll") &&
+            parent.scrollHeight > parent.clientHeight;
+
+          const canScrollX =
+            (overflowX === "auto" || overflowX === "scroll") &&
+            parent.scrollWidth > parent.clientWidth;
+
+          if (canScrollY || canScrollX) {
+            return "div." + (Array.from(parent.classList) || []).join(".");
+          }
+
+          parent = parent.parentElement;
+        }
+        return "body";
+      });
+      const seen = new Set<string>();
+      const contacts: Contact[] = [];
+
+      while (true) {
+        const batch: Contact[] = await this.page.$$eval(nameSelector, (els) =>
+          els.map((el) => {
+            const name = (el as HTMLElement).getAttribute("title") || "";
+            return { name };
+          })
+        );
+
+        // Append new contacts preserving order
+        for (const c of batch) {
+          if (!seen.has(c.name)) {
+            seen.add(c.name);
+            contacts.push(c);
+          }
+        }
+
+        // Attempt to scroll down; break when we've reached the end
+        const scrolled = await this.page
+          .$eval(scrollSelector, (el) => {
+            const { scrollTop, scrollHeight, clientHeight } = el as HTMLElement;
+            if (scrollTop + clientHeight >= scrollHeight) return false;
+            (el as HTMLElement).scrollBy(0, clientHeight);
+            return Math.round(el.scrollTop + el.clientHeight) < el.scrollHeight;
+          })
+          .catch(() => false);
+        if (!scrolled) break;
+        await this.page.waitForTimeout(500);
+      }
+
+      // Close the dialog
+      await this.page.click('div[aria-label="Back"]');
+
+      return contacts;
+    } catch (err) {
+      this.emit("error", err);
+      return [];
+    }
+  }
+
+  /**
+   * Send a text message to a contact by phone number if available,
+   * otherwise fall back to searching by the contact's display name.
+   */
+  async sendTextToContact(
+    contact: Contact,
+    text: string
+  ): Promise<string | undefined> {
+    if (contact.phone) {
+      await this.sendText(contact.phone, text);
+      return contact.phone;
+    }
+    if (!this.page) throw new Error("Driver not initialised");
+    await this.ensureReady();
+    const searchSelector = "div[contenteditable='true'][data-tab='3']";
+    const composerSelector = "div[contenteditable='true'][data-tab]";
+    await this.page.click(searchSelector);
+    await this.page.fill(searchSelector, contact.name);
+    await this.page.waitForSelector(`span[title='${contact.name}']`, {
+      timeout: 15000,
+    });
+    await this.page.click(`span[title='${contact.name}']`);
+    await this.page.waitForSelector(composerSelector, { timeout: 15000 });
+    const phone = await this.page.evaluate(() => {
+      const header = document.querySelector("header [data-testid]");
+      if (!header) return undefined;
+      const testId = header.getAttribute("data-testid") || "";
+      const m = testId.match(/(\d+)(@c\.us)?/);
+      if (m) return m[1];
+      const title = header.querySelector("span[title]") as HTMLElement | null;
+      const t = title?.getAttribute("title") || "";
+      if (/^\+?\d+$/.test(t)) return t;
+      return undefined;
+    });
+    await delay(400 + Math.random() * 800);
+    await this.page.keyboard.type(text);
+    await this.page.keyboard.press("Enter");
+    await delay(1000);
+    return phone || undefined;
   }
 
   /**

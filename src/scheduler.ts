@@ -12,7 +12,8 @@ import { Schedule, ScheduleDto, SchedulesFile } from "./types.js";
 import { clampInterval, now, toIso, uuid } from "./utils.js";
 
 export type ScheduleSendFn = (payload: {
-  phone: string;
+  phone?: string;
+  name?: string;
   text: string;
   disablePrefix?: boolean;
   scheduleId?: string;
@@ -110,6 +111,7 @@ export class Scheduler {
         try {
           await this.sendFn({
             phone: sched.phone,
+            name: sched.name,
             text: sched.text,
             disablePrefix: sched.disablePrefix,
             scheduleId: sched.id,
@@ -156,6 +158,7 @@ export class Scheduler {
     const schedule: Schedule = {
       id: uuid(),
       phone: dto.phone,
+      name: dto.name,
       text: dto.text,
       disablePrefix: dto.disablePrefix ?? false,
       firstRunAt: toIso(firstRunAt),
@@ -192,7 +195,8 @@ export class Scheduler {
   ): Promise<Schedule | undefined> {
     const sched = this.get(id);
     if (!sched) return undefined;
-    if (updates.phone) sched.phone = updates.phone;
+    if (updates.phone !== undefined) sched.phone = updates.phone;
+    if (updates.name !== undefined) sched.name = updates.name;
     if (updates.text) sched.text = updates.text;
     if (typeof updates.disablePrefix === "boolean")
       sched.disablePrefix = updates.disablePrefix;
@@ -252,6 +256,7 @@ export class Scheduler {
     try {
       await this.sendFn({
         phone: sched.phone,
+        name: sched.name,
         text: sched.text,
         disablePrefix: sched.disablePrefix,
         scheduleId: sched.id,

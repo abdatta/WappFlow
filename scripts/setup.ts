@@ -13,6 +13,7 @@ const defaults: Record<string, Json> = {
     rate: { perMin: 10, perDay: 200, warmup: true, firstRunAt: null },
     prefix: { text: "[wappbot]: ", defaultEnabled: true },
     vapid: { publicKey: "", privateKey: "" },
+    topContactsN: 10,
   },
   "limits.json": {
     tokens: 10,
@@ -23,6 +24,7 @@ const defaults: Record<string, Json> = {
   "subs.json": { subs: [] },
   "session.json": { qr: null, ready: false, lastReadyAt: null },
   "schedules.json": { schedules: [], meta: { tz: "America/Los_Angeles" } },
+  "contacts.json": { contacts: [] },
   "sends.log.jsonl": "", // append-only log
 };
 
@@ -68,7 +70,7 @@ function createOrResetFile(name: string, content: Json) {
       };
       writeAtomic(file, JSON.stringify(merged, null, 2));
       console.log(
-        `${FORCE ? "Reset" : "Created"} ${name} (preserved VAPID keys)`
+        `${FORCE ? "Reset" : "Created"} ${name} (preserved VAPID keys)`,
       );
       return;
     }
@@ -81,16 +83,27 @@ function createOrResetFile(name: string, content: Json) {
       writeAtomic(file, JSON.stringify(content, null, 2));
     }
     console.log(
-      `${fs.existsSync(file) && FORCE ? "Reset" : "Created"} ${name}`
+      `${fs.existsSync(file) && FORCE ? "Reset" : "Created"} ${name}`,
     );
   } else {
     console.log(`OK (exists) ${name}`);
   }
 }
 
+function ensureSettingsDefaults() {
+  const file = path.join(dataDir, "settings.json");
+  const current = readJsonSafe<Record<string, any>>(file);
+  if (!current) return;
+  if (typeof current.topContactsN !== "number") {
+    current.topContactsN = 10;
+    writeAtomic(file, JSON.stringify(current, null, 2));
+    console.log("Updated settings.json with topContactsN");
+  }
+}
+
 function main() {
   console.log(
-    `Bootstrapping data/ ${FORCE ? "(force reset enabled)" : "(create-only)"}`
+    `Bootstrapping data/ ${FORCE ? "(force reset enabled)" : "(create-only)"}`,
   );
   ensureDir(dataDir);
 
@@ -98,10 +111,12 @@ function main() {
     createOrResetFile(name, content);
   });
 
+  ensureSettingsDefaults();
+
   console.log("Setup complete ✅");
   if (FORCE && !RESET_VAPID) {
     console.log(
-      "Note: VAPID keys were preserved. Use --reset-vapid to wipe them."
+      "Note: VAPID keys were preserved. Use --reset-vapid to wipe them.",
     );
   }
 }

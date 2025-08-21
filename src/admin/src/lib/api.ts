@@ -1,4 +1,5 @@
 import axios from "axios";
+import type { Contact } from "./types";
 
 // A simple API wrapper around axios. The admin token is stored
 // locally in memory for demonstration purposes. In a real admin
@@ -29,7 +30,8 @@ export async function fetchHealth() {
 }
 
 export async function sendMessage(data: {
-  phone: string;
+  phone?: string;
+  name?: string;
   text: string;
   disablePrefix?: boolean;
 }) {
@@ -79,5 +81,17 @@ export async function pauseSchedule(id: string) {
 
 export async function resumeSchedule(id: string) {
   const res = await instance.post(`/schedules/${id}/resume`);
+  return res.data;
+}
+
+export async function fetchTopContacts(
+  n?: number,
+): Promise<{ contacts: Contact[] }> {
+  const res = await instance.get("/contacts/top", { params: { n } });
+  return res.data;
+}
+
+export async function fetchAllContacts(): Promise<{ contacts: Contact[] }> {
+  const res = await instance.get("/contacts/all");
   return res.data;
 }

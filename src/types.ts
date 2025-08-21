@@ -40,6 +40,7 @@ export interface Settings {
   rate: RateConfig;
   prefix: PrefixConfig;
   vapid: VapidConfig;
+  topContactsN: 10 | 20;
 }
 
 export interface Limits {
@@ -54,14 +55,16 @@ export interface Limits {
 }
 
 export interface SendRequestDto {
-  phone: string;
+  phone?: string;
+  name?: string;
   text: string;
   disablePrefix?: boolean;
   idempotencyKey?: string;
 }
 
 export interface ScheduleDto {
-  phone: string;
+  phone?: string;
+  name?: string;
   text: string;
   disablePrefix?: boolean;
   firstRunAt?: string | null;
@@ -69,12 +72,17 @@ export interface ScheduleDto {
   active?: boolean;
 }
 
-export interface Schedule
-  extends Required<
-    Omit<ScheduleDto, "firstRunAt" | "intervalMinutes" | "active">
-  > {
+export interface Schedule {
   /** Unique identifier for the schedule. */
   id: string;
+  /** Contact phone number if available. */
+  phone?: string;
+  /** Contact name if phone is not known. */
+  name?: string;
+  /** Message text to send. */
+  text: string;
+  /** Whether to skip prefix when sending. */
+  disablePrefix: boolean;
   /** ISO timestamp of the first execution. */
   firstRunAt: string;
   /** Next time the job should run (ISO). */
@@ -148,4 +156,13 @@ export interface LogEntry {
   textHash: string;
   result: "ok" | "error";
   error?: string;
+}
+
+export interface Contact {
+  name: string;
+  phone?: string;
+}
+
+export interface ContactsFile {
+  contacts: Contact[];
 }

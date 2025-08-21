@@ -105,9 +105,10 @@ The Express server will automatically serve the contents of this directory at `/
 
 ### Configuration
 
-- `data/settings.json` – core settings such as headless mode, prefix text, rate limits and VAPID keys. Edit this file to change the default prefix or timezone. The bot will recreate this file on first run if missing.
+- `data/settings.json` – core settings such as headless mode, prefix text, rate limits, VAPID keys and the default size of the top contacts list. Edit this file to change the default prefix or timezone. The bot will recreate this file on first run if missing.
 - `data/limits.json` – current rate limiting state. It is updated automatically.
 - `data/schedules.json` – stored schedules. Do not edit by hand unless the server is stopped.
+- `data/contacts.json` – cached contacts scraped from WhatsApp used for top contacts and search.
 - `data/subs.json` – web push subscriptions. Cleared when you revoke browser permission.
 - `.env.example` – template for environment variables. Copy it to `.env` and adjust values if needed.
 
