@@ -1,148 +1,109 @@
-import React from "react";
-import { NavLink, Routes, Route } from "react-router-dom";
-import Dashboard from "./pages/Dashboard";
-import Send from "./pages/Send";
-import Scheduling from "./pages/Scheduling";
-import Alerts from "./pages/Alerts";
-import Qr from "./pages/Qr";
-
-import {
-  AppBar,
-  Box,
-  Button,
-  CssBaseline,
-  IconButton,
-  ThemeProvider,
-  Toolbar,
-  Typography,
-  createTheme,
-} from "@mui/material";
-import { Brightness4, Brightness7 } from "@mui/icons-material";
+import React, { useEffect, useState } from "react";
 
 export default function App() {
-  const [mode, setMode] = React.useState<"light" | "dark">("dark");
+  const [dark, setDark] = useState(true);
 
-  const theme = React.useMemo(
-    () =>
-      createTheme({
-        palette: {
-          mode,
-          primary: { main: "#00e5ff" },
-          secondary: { main: "#7c4dff" },
-          background: {
-            default: mode === "dark" ? "#0a1929" : "#fafafa",
-            paper: mode === "dark" ? "rgba(255,255,255,0.05)" : "#fff",
-          },
-        },
-        typography: {
-          fontFamily: '"Roboto","Helvetica","Arial",sans-serif',
-          fontWeightBold: 700,
-        },
-        components: {
-          MuiPaper: {
-            styleOverrides: {
-              root: {
-                backgroundImage: "none",
-                backdropFilter: "blur(12px)",
-              },
-            },
-          },
-        },
-      }),
-    [mode]
-  );
+  useEffect(() => {
+    document.documentElement.classList.toggle("dark", dark);
+  }, [dark]);
 
-  const navButton = ({ isActive }: { isActive: boolean }) => ({
-    color: isActive ? theme.palette.primary.main : theme.palette.text.secondary,
-    mx: 1,
-    transition: "color .3s",
-    "&:hover": {
-      color: theme.palette.primary.light,
-      transform: "translateY(-2px)",
-    },
-  });
+  const navItems = ["Dashboard", "Messages", "Analytics", "Settings"];
 
   return (
-    <ThemeProvider theme={theme}>
-      <CssBaseline />
-      <AppBar
-        position="sticky"
-        color="transparent"
-        elevation={0}
-        sx={{
-          backdropFilter: "blur(12px)",
-          borderBottom: 1,
-          borderColor: "divider",
-        }}
-      >
-        <Toolbar>
-          <Typography
-            variant="h6"
-            sx={{
-              flexGrow: 1,
-              fontWeight: 800,
-              background: "linear-gradient(45deg,#5B86E5,#36D1DC)",
-              WebkitBackgroundClip: "text",
-              color: "transparent",
-            }}
+    <div className="min-h-screen flex bg-gradient-to-br from-gray-900 via-gray-800 to-black text-gray-100">
+      <aside className="hidden md:flex md:flex-col w-64 p-6 bg-black/30 backdrop-blur-xl border-r border-green-500/20">
+        <h1 className="text-2xl font-bold mb-8 text-green-400">WappFlow</h1>
+        <nav className="space-y-2">
+          {navItems.map((item) => (
+            <a
+              key={item}
+              href="#"
+              className="block px-4 py-2 rounded-lg text-gray-400 hover:text-green-400 hover:bg-green-500/10 transition"
+            >
+              {item}
+            </a>
+          ))}
+        </nav>
+      </aside>
+      <main className="flex-1 p-6 space-y-6 overflow-y-auto">
+        <header className="flex justify-between items-center">
+          <h2 className="text-3xl font-semibold text-green-400">Dashboard</h2>
+          <button
+            onClick={() => setDark(!dark)}
+            className="px-3 py-1 rounded-full bg-green-500/10 text-green-400 hover:bg-green-500/20 transition"
           >
-            Admin
-          </Typography>
-          <NavLink to="/" end>
-            {({ isActive }) => (
-              <Button sx={navButton({ isActive })}>Dashboard</Button>
-            )}
-          </NavLink>
-          <NavLink to="/send">
-            {({ isActive }) => <Button sx={navButton({ isActive })}>Send</Button>}
-          </NavLink>
-          <NavLink to="/scheduling">
-            {({ isActive }) => (
-              <Button sx={navButton({ isActive })}>Scheduling</Button>
-            )}
-          </NavLink>
-          <NavLink to="/alerts">
-            {({ isActive }) => (
-              <Button sx={navButton({ isActive })}>Alerts</Button>
-            )}
-          </NavLink>
-          <NavLink to="/qr">
-            {({ isActive }) => <Button sx={navButton({ isActive })}>QR</Button>}
-          </NavLink>
-          <IconButton
-            color="inherit"
-            onClick={() => setMode(mode === "light" ? "dark" : "light")}
-            sx={{
-              ml: 1,
-              transition: "transform .3s",
-              "&:hover": { transform: "rotate(20deg)" },
-            }}
-          >
-            {mode === "dark" ? <Brightness7 /> : <Brightness4 />}
-          </IconButton>
-        </Toolbar>
-      </AppBar>
-      <Box
-        sx={{
-          flexGrow: 1,
-          p: 3,
-          minHeight: "100vh",
-          background:
-            mode === "dark"
-              ? "radial-gradient(circle at top left, #1e3a8a, #0f172a)"
-              : "linear-gradient(135deg,#fdfbfb 0%,#ebedee 100%)",
-          transition: "background .5s",
-        }}
-      >
-        <Routes>
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/send" element={<Send />} />
-          <Route path="/scheduling" element={<Scheduling />} />
-          <Route path="/alerts" element={<Alerts />} />
-          <Route path="/qr" element={<Qr />} />
-        </Routes>
-      </Box>
-    </ThemeProvider>
+            {dark ? "Light" : "Dark"}
+          </button>
+        </header>
+
+        <section className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="p-6 rounded-xl bg-white/5 backdrop-blur-lg shadow-lg hover:shadow-green-500/20 transition">
+            <p className="text-sm uppercase tracking-wide text-gray-400">Sessions</p>
+            <p className="mt-2 text-3xl font-bold text-green-400">8</p>
+          </div>
+          <div className="p-6 rounded-xl bg-white/5 backdrop-blur-lg shadow-lg hover:shadow-green-500/20 transition">
+            <p className="text-sm uppercase tracking-wide text-gray-400">Messages</p>
+            <p className="mt-2 text-3xl font-bold text-green-400">1.2k</p>
+          </div>
+          <div className="p-6 rounded-xl bg-white/5 backdrop-blur-lg shadow-lg hover:shadow-green-500/20 transition">
+            <p className="text-sm uppercase tracking-wide text-gray-400">Deliveries</p>
+            <p className="mt-2 text-3xl font-bold text-green-400">98%</p>
+          </div>
+          <div className="p-6 rounded-xl bg-white/5 backdrop-blur-lg shadow-lg hover:shadow-green-500/20 transition">
+            <p className="text-sm uppercase tracking-wide text-gray-400">Errors</p>
+            <p className="mt-2 text-3xl font-bold text-green-400">2</p>
+          </div>
+        </section>
+
+        <section className="grid md:grid-cols-2 gap-6">
+          <div className="p-6 rounded-xl bg-white/5 backdrop-blur-lg shadow-lg">
+            <h3 className="mb-4 font-semibold text-green-400">Overview</h3>
+            <div className="h-48 flex items-center justify-center text-gray-500">
+              <svg viewBox="0 0 200 100" className="w-full h-full">
+                <polyline
+                  fill="none"
+                  stroke="#25D366"
+                  strokeWidth="3"
+                  points="0,80 40,60 80,65 120,20 160,30 200,10"
+                />
+              </svg>
+            </div>
+          </div>
+          <div className="p-6 rounded-xl bg-white/5 backdrop-blur-lg shadow-lg">
+            <h3 className="mb-4 font-semibold text-green-400">Customers</h3>
+            <ul className="space-y-4">
+              <li className="flex items-center gap-3">
+                <span className="w-10 h-10 rounded-full bg-green-500/20 flex items-center justify-center text-green-400">
+                  SJ
+                </span>
+                <div>
+                  <p className="font-medium">Sarah Johnson</p>
+                  <p className="text-sm text-gray-400">Active</p>
+                </div>
+              </li>
+              <li className="flex items-center gap-3">
+                <span className="w-10 h-10 rounded-full bg-green-500/20 flex items-center justify-center text-green-400">
+                  RB
+                </span>
+                <div>
+                  <p className="font-medium">Rahul B</p>
+                  <p className="text-sm text-gray-400">Offline</p>
+                </div>
+              </li>
+              <li className="flex items-center gap-3">
+                <span className="w-10 h-10 rounded-full bg-green-500/20 flex items-center justify-center text-green-400">
+                  MK
+                </span>
+                <div>
+                  <p className="font-medium">Maria K</p>
+                  <p className="text-sm text-gray-400">Active</p>
+                </div>
+              </li>
+            </ul>
+          </div>
+        </section>
+      </main>
+    </div>
   );
 }
 
