@@ -1,4 +1,18 @@
 import React, { useEffect, useState } from "react";
+import { Box, Card, Stack, Typography } from "@mui/material";
+
+const glassCard = {
+  p: 4,
+  borderRadius: 2,
+  backgroundColor: "rgba(255,255,255,0.08)",
+  backdropFilter: "blur(10px)",
+  boxShadow: "0 8px 32px rgba(0,0,0,0.2)",
+  transition: "transform .3s, box-shadow .3s",
+  "&:hover": {
+    transform: "translateY(-4px)",
+    boxShadow: "0 16px 32px rgba(0,0,0,0.4)",
+  },
+};
 
 export default function Qr() {
   const [src, setSrc] = useState("");
@@ -12,15 +26,17 @@ export default function Qr() {
     return () => clearInterval(id);
   }, []);
   return (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-bold">QR Code</h1>
-      <div className="bg-gray-800 p-4 rounded-lg inline-block">
+    <Stack spacing={4} alignItems="center">
+      <Typography variant="h4" fontWeight="bold">
+        QR Code
+      </Typography>
+      <Card sx={glassCard}>
         {src ? (
-          <img src={src} alt="QR" className="max-w-full" />
+          <Box component="img" src={src} alt="QR" sx={{ maxWidth: "100%" }} />
         ) : (
-          <p>Loading...</p>
+          <Typography>Loading...</Typography>
         )}
-      </div>
-    </div>
+      </Card>
+    </Stack>
   );
 }

@@ -11,6 +11,29 @@ import {
   fetchAllContacts,
 } from "../lib/api";
 import type { Contact } from "../lib/types";
+import {
+  Box,
+  Button,
+  Card,
+  Checkbox,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  FormControlLabel,
+  List,
+  ListItem,
+  ListItemButton,
+  ListItemText,
+  Stack,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableRow,
+  TextField,
+  Typography,
+} from "@mui/material";
 
 interface Schedule {
   id: string;
@@ -24,6 +47,19 @@ interface Schedule {
   active: boolean;
   lastRunAt: string | null;
 }
+
+const glassCard = {
+  p: 3,
+  borderRadius: 2,
+  backgroundColor: "rgba(255,255,255,0.08)",
+  backdropFilter: "blur(10px)",
+  boxShadow: "0 8px 32px rgba(0,0,0,0.2)",
+  transition: "transform .3s, box-shadow .3s",
+  "&:hover": {
+    transform: "translateY(-4px)",
+    boxShadow: "0 16px 32px rgba(0,0,0,0.4)",
+  },
+};
 
 export default function Scheduling() {
   const [schedules, setSchedules] = useState<Schedule[]>([]);
@@ -52,14 +88,14 @@ export default function Scheduling() {
   const suggestions = selected
     ? []
     : form.phone
-      ? allContacts.filter(
-          (c) =>
-            c.phone?.includes(form.phone) ||
-            c.name.toLowerCase().includes(form.phone.toLowerCase()),
-        )
-      : showAll
-        ? allContacts
-        : topContacts;
+    ? allContacts.filter(
+        (c) =>
+          c.phone?.includes(form.phone) ||
+          c.name.toLowerCase().includes(form.phone.toLowerCase())
+      )
+    : showAll
+    ? allContacts
+    : topContacts;
 
   useEffect(() => {
     refresh();
@@ -132,305 +168,206 @@ export default function Scheduling() {
   async function handleUpdate(e: React.FormEvent) {
     e.preventDefault();
     if (!edit) return;
-    const payload: any = {
+    await updateSchedule(edit.id, {
       text: edit.text,
       disablePrefix: edit.disablePrefix,
+      firstRunAt: edit.firstRunAt ? new Date(edit.firstRunAt).toISOString() : undefined,
+      intervalMinutes: edit.intervalMinutes ? Number(edit.intervalMinutes) : undefined,
       active: edit.active,
-    };
-    if (edit.firstRunAt)
-      payload.firstRunAt = new Date(edit.firstRunAt).toISOString();
-    if (edit.intervalMinutes)
-      payload.intervalMinutes = Number(edit.intervalMinutes);
-    await updateSchedule(edit.id, payload);
+    });
     setEdit(null);
     refresh();
   }
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-bold">Scheduling</h1>
-      {/* Create form */}
-      <div className="bg-gray-800 p-4 rounded-lg space-y-4 max-w-xl">
-        <h2 className="text-lg font-medium">Create Schedule</h2>
-        <form onSubmit={handleCreate} className="space-y-3">
-          <div>
-            <label className="block mb-1">Contact</label>
-            <input
-              type="text"
-              value={form.phone}
-              onChange={(e) => {
-                setForm({ ...form, phone: e.target.value });
-                setSelected(null);
-                if (e.target.value) setShowAll(false);
-              }}
-              className="w-full px-3 py-2 rounded bg-gray-700 text-white"
-            />
-            {suggestions.length > 0 ? (
-              <div className="mt-2 max-h-48 overflow-y-auto space-y-2">
-                {suggestions.map((c) => (
-                  <button
-                    key={c.phone || c.name}
-                    type="button"
+    <Stack spacing={4}>
+      <Typography variant="h4" fontWeight="bold">
+        Scheduling
+      </Typography>
+      <Card sx={glassCard}>
+        <Box
+          component="form"
+          onSubmit={handleCreate}
+          sx={{ display: "flex", flexDirection: "column", gap: 2 }}
+        >
+          <TextField
+            label="Contact"
+            value={form.phone}
+            onChange={(e) => {
+              setForm({ ...form, phone: e.target.value });
+              setSelected(null);
+              if (e.target.value) setShowAll(false);
+            }}
+            fullWidth
+          />
+          {suggestions.length > 0 && (
+            <List sx={{ maxHeight: 200, overflow: "auto", mb: 1 }}>
+              {suggestions.map((c) => (
+                <ListItem key={c.phone || c.name} disablePadding>
+                  <ListItemButton
                     onClick={() => {
                       setSelected(c);
-                      setForm({
-                        ...form,
-                        phone: c.phone ? `${c.name} (${c.phone})` : c.name,
-                      });
+                      setForm({ ...form, phone: c.phone ? `${c.name} (${c.phone})` : c.name });
                     }}
-                    className="block w-full text-left bg-gray-700 hover:bg-gray-600 p-2 rounded"
                   >
-                    <div className="font-medium">{c.name}</div>
-                    {c.phone && (
-                      <div className="text-xs text-gray-400">{c.phone}</div>
-                    )}
-                  </button>
-                ))}
-              </div>
-            ) : (
-              !form.phone && (
-                <p className="text-sm text-gray-400 mt-2">
-                  No contacts yet. Add or import contacts to get started.
-                </p>
-              )
-            )}
-            {!form.phone &&
-              !showAll &&
-              allContacts.length > topContacts.length && (
-                <button
-                  type="button"
-                  onClick={() => setShowAll(true)}
-                  className="text-blue-400 text-sm mt-2"
-                >
-                  View all
-                </button>
-              )}
-          </div>
-          <div>
-            <label className="block mb-1">Message</label>
-            <textarea
-              value={form.text}
-              onChange={(e) => setForm({ ...form, text: e.target.value })}
-              className="w-full px-3 py-2 rounded bg-gray-700 text-white"
-            />
-          </div>
-          <div className="flex items-center space-x-2">
-            <input
-              type="checkbox"
-              checked={form.disablePrefix}
-              id="createDisablePrefix"
-              onChange={(e) =>
-                setForm({ ...form, disablePrefix: e.target.checked })
-              }
-            />
-            <label htmlFor="createDisablePrefix">Disable prefix</label>
-          </div>
-          <div>
-            <label className="block mb-1">First run (local)</label>
-            <input
-              type="datetime-local"
-              value={form.firstRunAt}
-              onChange={(e) => setForm({ ...form, firstRunAt: e.target.value })}
-              className="w-full px-3 py-2 rounded bg-gray-700 text-white"
-            />
-          </div>
-          <div>
-            <label className="block mb-1">Interval (minutes, min 60)</label>
-            <input
-              type="number"
-              min="0"
-              step="60"
-              value={form.intervalMinutes}
-              onChange={(e) =>
-                setForm({ ...form, intervalMinutes: e.target.value })
-              }
-              className="w-full px-3 py-2 rounded bg-gray-700 text-white"
-            />
-          </div>
-          <div className="flex items-center space-x-2">
-            <input
-              type="checkbox"
-              checked={form.active}
-              id="createActive"
-              onChange={(e) => setForm({ ...form, active: e.target.checked })}
-            />
-            <label htmlFor="createActive">Active</label>
-          </div>
-          <button
-            type="submit"
-            className="bg-green-600 hover:bg-green-700 px-4 py-2 rounded"
-          >
-            Create
-          </button>
-          {status && <p className="text-yellow-400 text-sm">{status}</p>}
-        </form>
-      </div>
-      {/* List */}
-      <div className="bg-gray-800 p-4 rounded-lg">
-        <h2 className="text-lg font-medium mb-4">Existing Schedules</h2>
-        <div className="overflow-x-auto">
-          <table className="min-w-full text-left text-sm">
-            <thead className="bg-gray-700">
-              <tr>
-                <th className="px-3 py-2">Contact</th>
-                <th className="px-3 py-2">Message</th>
-                <th className="px-3 py-2">Prefix</th>
-                <th className="px-3 py-2">Next Run</th>
-                <th className="px-3 py-2">Interval</th>
-                <th className="px-3 py-2">Active</th>
-                <th className="px-3 py-2">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {schedules.map((s) => (
-                <tr key={s.id} className="odd:bg-gray-700">
-                  <td className="px-3 py-2 whitespace-nowrap">
-                    {s.name || s.phone}
-                  </td>
-                  <td className="px-3 py-2 whitespace-nowrap max-w-xs truncate">
-                    {s.text}
-                  </td>
-                  <td className="px-3 py-2 whitespace-nowrap">
-                    {s.disablePrefix ? "Off" : "On"}
-                  </td>
-                  <td className="px-3 py-2 whitespace-nowrap">
-                    {new Date(s.nextRunAt).toLocaleString()}
-                  </td>
-                  <td className="px-3 py-2 whitespace-nowrap">
-                    {s.intervalMinutes ?? "None"}
-                  </td>
-                  <td className="px-3 py-2 whitespace-nowrap">
-                    {s.active ? "Yes" : "No"}
-                  </td>
-                  <td className="px-3 py-2 whitespace-nowrap space-x-2">
-                    <button
-                      onClick={() =>
-                        setEdit({
-                          id: s.id,
-                          text: s.text,
-                          disablePrefix: s.disablePrefix,
-                          firstRunAt: s.firstRunAt,
-                          intervalMinutes: s.intervalMinutes ?? "",
-                          active: s.active,
-                        })
-                      }
-                      className="bg-blue-600 hover:bg-blue-700 px-2 py-1 rounded"
-                    >
-                      Edit
-                    </button>
-                    <button
-                      onClick={() => handleRun(s.id)}
-                      className="bg-green-600 hover:bg-green-700 px-2 py-1 rounded"
-                    >
-                      Run
-                    </button>
-                    {s.active ? (
-                      <button
-                        onClick={() => handlePause(s.id)}
-                        className="bg-yellow-600 hover:bg-yellow-700 px-2 py-1 rounded"
-                      >
-                        Pause
-                      </button>
-                    ) : (
-                      <button
-                        onClick={() => handleResume(s.id)}
-                        className="bg-purple-600 hover:bg-purple-700 px-2 py-1 rounded"
-                      >
-                        Resume
-                      </button>
-                    )}
-                    <button
-                      onClick={() => handleDelete(s.id)}
-                      className="bg-red-600 hover:bg-red-700 px-2 py-1 rounded"
-                    >
-                      Delete
-                    </button>
-                  </td>
-                </tr>
+                    <ListItemText primary={c.name} secondary={c.phone || undefined} />
+                  </ListItemButton>
+                </ListItem>
               ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-      {/* Edit modal */}
-      {edit && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
-          <div className="bg-gray-800 p-6 rounded-lg space-y-4 w-96">
-            <h3 className="text-lg font-medium">Edit Schedule</h3>
-            <form onSubmit={handleUpdate} className="space-y-3">
-              <div>
-                <label className="block mb-1">Message</label>
-                <textarea
-                  value={edit.text}
-                  onChange={(e) => setEdit({ ...edit, text: e.target.value })}
-                  className="w-full px-3 py-2 rounded bg-gray-700 text-white"
-                />
-              </div>
-              <div className="flex items-center space-x-2">
-                <input
-                  type="checkbox"
-                  checked={edit.disablePrefix}
-                  id="editDisablePrefix"
-                  onChange={(e) =>
-                    setEdit({ ...edit, disablePrefix: e.target.checked })
-                  }
-                />
-                <label htmlFor="editDisablePrefix">Disable prefix</label>
-              </div>
-              <div>
-                <label className="block mb-1">First run (local)</label>
-                <input
-                  type="datetime-local"
-                  value={edit.firstRunAt}
-                  onChange={(e) =>
-                    setEdit({ ...edit, firstRunAt: e.target.value })
-                  }
-                  className="w-full px-3 py-2 rounded bg-gray-700 text-white"
-                />
-              </div>
-              <div>
-                <label className="block mb-1">Interval (minutes)</label>
-                <input
-                  type="number"
-                  min="0"
-                  step="60"
-                  value={edit.intervalMinutes}
-                  onChange={(e) =>
-                    setEdit({ ...edit, intervalMinutes: e.target.value })
-                  }
-                  className="w-full px-3 py-2 rounded bg-gray-700 text-white"
-                />
-              </div>
-              <div className="flex items-center space-x-2">
-                <input
-                  type="checkbox"
-                  checked={edit.active}
-                  id="editActive"
-                  onChange={(e) =>
-                    setEdit({ ...edit, active: e.target.checked })
-                  }
-                />
-                <label htmlFor="editActive">Active</label>
-              </div>
-              <div className="flex justify-end space-x-2">
-                <button
-                  type="button"
-                  onClick={() => setEdit(null)}
-                  className="bg-gray-600 hover:bg-gray-700 px-3 py-1 rounded"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="bg-blue-600 hover:bg-blue-700 px-3 py-1 rounded"
-                >
-                  Save
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-    </div>
+            </List>
+          )}
+          {!form.phone && !showAll && allContacts.length > topContacts.length && (
+            <Button onClick={() => setShowAll(true)} size="small">
+              View all
+            </Button>
+          )}
+          <TextField
+            label="Message"
+            value={form.text}
+            onChange={(e) => setForm({ ...form, text: e.target.value })}
+            multiline
+            minRows={3}
+            fullWidth
+          />
+          <FormControlLabel
+            control={
+              <Checkbox
+                checked={form.disablePrefix}
+                onChange={(e) => setForm({ ...form, disablePrefix: e.target.checked })}
+              />
+            }
+            label="Disable prefix"
+          />
+          <TextField
+            label="First run (local)"
+            type="datetime-local"
+            value={form.firstRunAt}
+            onChange={(e) => setForm({ ...form, firstRunAt: e.target.value })}
+            InputLabelProps={{ shrink: true }}
+            fullWidth
+          />
+          <TextField
+            label="Interval (minutes)"
+            type="number"
+            value={form.intervalMinutes}
+            onChange={(e) => setForm({ ...form, intervalMinutes: e.target.value })}
+            fullWidth
+          />
+          <FormControlLabel
+            control={
+              <Checkbox
+                checked={form.active}
+                onChange={(e) => setForm({ ...form, active: e.target.checked })}
+              />
+            }
+            label="Active"
+          />
+          <Button type="submit" variant="contained" color="primary">
+            Create Schedule
+          </Button>
+          {status && (
+            <Typography variant="body2" color="warning.main">
+              {status}
+            </Typography>
+          )}
+        </Box>
+      </Card>
+      <Card sx={glassCard}>
+        <Table>
+          <TableHead>
+            <TableRow>
+              <TableCell>To</TableCell>
+              <TableCell>Message</TableCell>
+              <TableCell>Next Run</TableCell>
+              <TableCell align="right">Actions</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {schedules.map((s) => (
+              <TableRow key={s.id} hover>
+                <TableCell>{s.phone || s.name}</TableCell>
+                <TableCell>{s.text}</TableCell>
+                <TableCell>{new Date(s.nextRunAt).toLocaleString()}</TableCell>
+                <TableCell align="right">
+                  <Button size="small" onClick={() =>
+                    setEdit({
+                      id: s.id,
+                      text: s.text,
+                      disablePrefix: s.disablePrefix,
+                      firstRunAt: s.firstRunAt ? s.firstRunAt.slice(0,16) : "",
+                      intervalMinutes: s.intervalMinutes ?? "",
+                      active: s.active,
+                    })
+                  }>Edit</Button>
+                  <Button size="small" onClick={() => handleRun(s.id)}>Run</Button>
+                  {s.active ? (
+                    <Button size="small" onClick={() => handlePause(s.id)}>Pause</Button>
+                  ) : (
+                    <Button size="small" onClick={() => handleResume(s.id)}>Resume</Button>
+                  )}
+                  <Button size="small" color="error" onClick={() => handleDelete(s.id)}>
+                    Delete
+                  </Button>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </Card>
+      <Dialog open={Boolean(edit)} onClose={() => setEdit(null)} fullWidth maxWidth="sm">
+        <DialogTitle>Edit Schedule</DialogTitle>
+        {edit && (
+          <Box component="form" onSubmit={handleUpdate}>
+            <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+              <TextField
+                label="Message"
+                value={edit.text}
+                onChange={(e) => setEdit({ ...edit, text: e.target.value })}
+                multiline
+                minRows={3}
+                fullWidth
+              />
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={edit.disablePrefix}
+                    onChange={(e) => setEdit({ ...edit, disablePrefix: e.target.checked })}
+                  />
+                }
+                label="Disable prefix"
+              />
+              <TextField
+                label="First run (local)"
+                type="datetime-local"
+                value={edit.firstRunAt}
+                onChange={(e) => setEdit({ ...edit, firstRunAt: e.target.value })}
+                InputLabelProps={{ shrink: true }}
+                fullWidth
+              />
+              <TextField
+                label="Interval (minutes)"
+                type="number"
+                value={edit.intervalMinutes}
+                onChange={(e) => setEdit({ ...edit, intervalMinutes: e.target.value })}
+                fullWidth
+              />
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={edit.active}
+                    onChange={(e) => setEdit({ ...edit, active: e.target.checked })}
+                  />
+                }
+                label="Active"
+              />
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={() => setEdit(null)}>Cancel</Button>
+              <Button type="submit">Save</Button>
+            </DialogActions>
+          </Box>
+        )}
+      </Dialog>
+    </Stack>
   );
 }
