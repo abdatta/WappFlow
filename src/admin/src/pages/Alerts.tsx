@@ -42,7 +42,7 @@ export default function Alerts() {
       <h1 className="text-2xl font-bold">Alerts</h1>
       <ul className="space-y-2">
         {alerts.map((a) => (
-          <li key={a.ts} className="bg-gray-800 p-3 rounded-lg">
+          <li key={a.ts} className="bg-wa-panel p-3 rounded-lg">
             <div className="text-sm text-gray-400">
               {new Date(a.ts).toLocaleString()}
             </div>

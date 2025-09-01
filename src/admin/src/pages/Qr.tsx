@@ -14,7 +14,7 @@ export default function Qr() {
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-bold">QR Code</h1>
-      <div className="bg-gray-800 p-4 rounded-lg inline-block">
+      <div className="bg-wa-panel p-4 rounded-lg inline-block">
         {src ? (
           <img src={src} alt="QR" className="max-w-full" />
         ) : (
