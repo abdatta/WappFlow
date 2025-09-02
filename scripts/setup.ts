@@ -15,6 +15,7 @@ const defaults: Record<string, Json> = {
     vapid: { publicKey: "", privateKey: "" },
     topContactsN: 10,
     contactsRefreshInterval: 3600,
+    selfContactName: "You",
   },
   "limits.json": {
     tokens: 10,
@@ -96,21 +97,26 @@ function ensureSettingsDefaults() {
   const current = readJsonSafe<Record<string, any>>(file);
   if (!current) return;
 
+  const settingsDefaults = defaults["settings.json"] as Record<string, any>;
   let updated = false;
+
   if (typeof current.topContactsN !== "number") {
-    current.topContactsN = 10;
-    console.log("Updated settings.json with topContactsN");
+    current.topContactsN = settingsDefaults.topContactsN;
     updated = true;
   }
 
   if (typeof current.contactsRefreshInterval !== "number") {
-    current.contactsRefreshInterval = 3600;
-    console.log("Updated settings.json with contactsRefreshInterval");
+    current.contactsRefreshInterval = settingsDefaults.contactsRefreshInterval;
+    updated = true;
+  }
+  if (typeof current.selfContactName !== "string") {
+    current.selfContactName = settingsDefaults.selfContactName;
     updated = true;
   }
 
   if (updated) {
     writeAtomic(file, JSON.stringify(current, null, 2));
+    console.log("Updated settings.json with new defaults");
   }
 }
 

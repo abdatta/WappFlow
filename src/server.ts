@@ -117,12 +117,15 @@ async function main() {
     try {
       if (e164) {
         await driver.sendText(e164, body);
-        await appendSendLog({
-          ts: new Date().toISOString(),
-          phone: e164,
-          textHash: hashText(text),
-          result: "ok",
-        });
+        await appendSendLog(
+          {
+            ts: new Date().toISOString(),
+            phone: e164,
+            textHash: hashText(text),
+            result: "ok",
+          },
+          driver,
+        );
       } else if (target.name) {
         const resolvedPhone = await driver.sendTextToContact(
           { name: target.name },
@@ -131,25 +134,31 @@ async function main() {
         if (resolvedPhone) {
           await contacts.upsert({ name: target.name, phone: resolvedPhone });
         }
-        await appendSendLog({
-          ts: new Date().toISOString(),
-          phone: resolvedPhone,
-          name: target.name,
-          textHash: hashText(text),
-          result: "ok",
-        });
+        await appendSendLog(
+          {
+            ts: new Date().toISOString(),
+            phone: resolvedPhone,
+            name: target.name,
+            textHash: hashText(text),
+            result: "ok",
+          },
+          driver,
+        );
       } else {
         throw new Error("NO_TARGET");
       }
     } catch (err) {
-      await appendSendLog({
-        ts: new Date().toISOString(),
-        phone: e164,
-        name: target.name,
-        textHash: hashText(text),
-        result: "error",
-        error: String(err),
-      });
+      await appendSendLog(
+        {
+          ts: new Date().toISOString(),
+          phone: e164,
+          name: target.name,
+          textHash: hashText(text),
+          result: "error",
+          error: String(err),
+        },
+        driver,
+      );
       throw err;
     } finally {
       await new Promise((resolve) => setTimeout(resolve, extraDelay));
