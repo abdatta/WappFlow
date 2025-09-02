@@ -111,6 +111,7 @@ export class WhatsAppDriver extends EventEmitter {
     await this.page.keyboard.press("Enter");
     // Confirm bubble by waiting a bit
     await delay(1000);
+    await this.switchToMeChat();
   }
 
   /**
@@ -234,8 +235,31 @@ export class WhatsAppDriver extends EventEmitter {
     await this.page.keyboard.type(text);
     await this.page.keyboard.press("Enter");
     await delay(1000);
+    await this.switchToMeChat();
 
     return undefined;
+  }
+
+  /**
+   * Switch to the chat with myself. This is used to reset
+   * the view after sending a message, to prevent accidental reads from other chats.
+   */
+  private async switchToMeChat(): Promise<void> {
+    if (!this.page) return;
+    try {
+      const searchSelector = "div[contenteditable='true'][data-tab='3']";
+      const contactName = "Me US (Mint)";
+      await this.page.click(searchSelector);
+      await this.page.fill(searchSelector, ""); // Clear search
+      await this.page.fill(searchSelector, contactName);
+      await this.page.waitForSelector(`span[title='${contactName}']`, {
+        timeout: 15000,
+      });
+      await this.page.click(`span[title='${contactName}']`);
+    } catch (err) {
+      console.error("Failed to switch to 'Me US (Mint)' chat:", err);
+      this.emit("error", new Error("Failed to switch to 'Me US (Mint)' chat"));
+    }
   }
 
   /**
