@@ -31,7 +31,7 @@ export class WhatsAppDriver extends EventEmitter {
   private browser: BrowserContext | null = null;
   private page: Page | null = null;
   private session: SessionState = { qr: null, ready: false, lastReadyAt: null };
-  private settings: Settings;
+  public settings: Settings;
 
   constructor(settings: Settings) {
     super();
@@ -248,7 +248,7 @@ export class WhatsAppDriver extends EventEmitter {
     if (!this.page) return;
     try {
       const searchSelector = "div[contenteditable='true'][data-tab='3']";
-      const contactName = "Me US (Mint)";
+      const contactName = this.settings.selfContactName;
       await this.page.click(searchSelector);
       await this.page.fill(searchSelector, ""); // Clear search
       await this.page.fill(searchSelector, contactName);
@@ -257,8 +257,16 @@ export class WhatsAppDriver extends EventEmitter {
       });
       await this.page.click(`span[title='${contactName}']`);
     } catch (err) {
-      console.error("Failed to switch to 'Me US (Mint)' chat:", err);
-      this.emit("error", new Error("Failed to switch to 'Me US (Mint)' chat"));
+      console.error(
+        `Failed to switch to '${this.settings.selfContactName}' chat:`,
+        err,
+      );
+      this.emit(
+        "error",
+        new Error(
+          `Failed to switch to '${this.settings.selfContactName}' chat`,
+        ),
+      );
     }
   }
 

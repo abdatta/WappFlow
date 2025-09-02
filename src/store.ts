@@ -13,7 +13,9 @@ import {
   SessionState,
   SchedulesFile,
   ContactsFile,
+  SendLogEntry,
 } from "./types.js";
+import { WhatsAppDriver } from "./driver.js";
 
 const DATA_DIR = path.join(process.cwd(), "data");
 
@@ -92,11 +94,28 @@ export async function saveContacts(file: ContactsFile): Promise<void> {
  * JSON object on its own line. Failures here should not crash
  * the process as the log is non‑critical.
  */
-export async function appendSendLog(entry: object): Promise<void> {
+export async function appendSendLog(
+  entry: SendLogEntry,
+  driver?: WhatsAppDriver,
+): Promise<void> {
   const filePath = path.join(DATA_DIR, "sends.log.jsonl");
   const line = JSON.stringify(entry) + "\n";
   try {
     await fs.appendFile(filePath, line, { encoding: "utf8" });
+    if (driver) {
+      const status = entry.result.toUpperCase();
+      const target = entry.name || entry.phone || "Unknown";
+      let logMsg = `[${status}] `;
+      if (entry.result === "ok") {
+        logMsg += `Message to ${target} sent.`;
+      } else {
+        logMsg += `Send to ${target} failed: ${entry.error}`;
+      }
+      await driver.sendTextToContact(
+        { name: driver.settings.selfContactName },
+        logMsg,
+      );
+    }
   } catch (err) {
     console.error("Failed to write send log:", err);
   }

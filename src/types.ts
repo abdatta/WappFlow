@@ -42,7 +42,17 @@ export interface Settings {
   vapid: VapidConfig;
   topContactsN: 10 | 20;
   contactsRefreshInterval?: number;
+  selfContactName: string;
 }
+
+export type SendLogEntry = {
+  ts: string;
+  phone?: string;
+  name?: string;
+  textHash: string;
+  result: "ok" | "error";
+  error?: string;
+};
 
 export interface Limits {
   /** Current tokens available in the bucket. */
