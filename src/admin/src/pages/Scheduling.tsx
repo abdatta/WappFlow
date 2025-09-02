@@ -150,7 +150,7 @@ export default function Scheduling() {
     <div className="space-y-6">
       <h1 className="text-2xl font-bold">Scheduling</h1>
       {/* Create form */}
-      <div className="bg-gray-800 p-4 rounded-lg space-y-4 max-w-xl">
+      <div className="bg-wa-panel p-4 rounded-lg space-y-4 max-w-xl">
         <h2 className="text-lg font-medium">Create Schedule</h2>
         <form onSubmit={handleCreate} className="space-y-3">
           <div>
@@ -163,7 +163,7 @@ export default function Scheduling() {
                 setSelected(null);
                 if (e.target.value) setShowAll(false);
               }}
-              className="w-full px-3 py-2 rounded bg-gray-700 text-white"
+              className="w-full px-3 py-2 rounded bg-wa-hover text-white"
             />
             {suggestions.length > 0 ? (
               <div className="mt-2 max-h-48 overflow-y-auto space-y-2">
@@ -178,7 +178,7 @@ export default function Scheduling() {
                         phone: c.phone ? `${c.name} (${c.phone})` : c.name,
                       });
                     }}
-                    className="block w-full text-left bg-gray-700 hover:bg-gray-600 p-2 rounded"
+                    className="block w-full text-left bg-wa-hover hover:bg-wa-panel p-2 rounded"
                   >
                     <div className="font-medium">{c.name}</div>
                     {c.phone && (
@@ -200,7 +200,7 @@ export default function Scheduling() {
                 <button
                   type="button"
                   onClick={() => setShowAll(true)}
-                  className="text-blue-400 text-sm mt-2"
+                  className="text-wa-green text-sm mt-2"
                 >
                   View all
                 </button>
@@ -211,7 +211,7 @@ export default function Scheduling() {
             <textarea
               value={form.text}
               onChange={(e) => setForm({ ...form, text: e.target.value })}
-              className="w-full px-3 py-2 rounded bg-gray-700 text-white"
+              className="w-full px-3 py-2 rounded bg-wa-hover text-white"
             />
           </div>
           <div className="flex items-center space-x-2">
@@ -231,7 +231,7 @@ export default function Scheduling() {
               type="datetime-local"
               value={form.firstRunAt}
               onChange={(e) => setForm({ ...form, firstRunAt: e.target.value })}
-              className="w-full px-3 py-2 rounded bg-gray-700 text-white"
+              className="w-full px-3 py-2 rounded bg-wa-hover text-white"
             />
           </div>
           <div>
@@ -244,7 +244,7 @@ export default function Scheduling() {
               onChange={(e) =>
                 setForm({ ...form, intervalMinutes: e.target.value })
               }
-              className="w-full px-3 py-2 rounded bg-gray-700 text-white"
+              className="w-full px-3 py-2 rounded bg-wa-hover text-white"
             />
           </div>
           <div className="flex items-center space-x-2">
@@ -258,7 +258,7 @@ export default function Scheduling() {
           </div>
           <button
             type="submit"
-            className="bg-green-600 hover:bg-green-700 px-4 py-2 rounded"
+            className="bg-wa-green hover:bg-wa-green/80 px-4 py-2 rounded text-wa-bg"
           >
             Create
           </button>
@@ -266,11 +266,11 @@ export default function Scheduling() {
         </form>
       </div>
       {/* List */}
-      <div className="bg-gray-800 p-4 rounded-lg">
+      <div className="bg-wa-panel p-4 rounded-lg">
         <h2 className="text-lg font-medium mb-4">Existing Schedules</h2>
         <div className="overflow-x-auto">
           <table className="min-w-full text-left text-sm">
-            <thead className="bg-gray-700">
+            <thead className="bg-wa-hover">
               <tr>
                 <th className="px-3 py-2">Contact</th>
                 <th className="px-3 py-2">Message</th>
@@ -283,7 +283,7 @@ export default function Scheduling() {
             </thead>
             <tbody>
               {schedules.map((s) => (
-                <tr key={s.id} className="odd:bg-gray-700">
+                <tr key={s.id} className="odd:bg-wa-hover">
                   <td className="px-3 py-2 whitespace-nowrap">
                     {s.name || s.phone}
                   </td>
@@ -320,7 +320,7 @@ export default function Scheduling() {
                     </button>
                     <button
                       onClick={() => handleRun(s.id)}
-                      className="bg-green-600 hover:bg-green-700 px-2 py-1 rounded"
+                      className="bg-wa-green hover:bg-wa-green/80 px-2 py-1 rounded text-wa-bg"
                     >
                       Run
                     </button>
@@ -355,7 +355,7 @@ export default function Scheduling() {
       {/* Edit modal */}
       {edit && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
-          <div className="bg-gray-800 p-6 rounded-lg space-y-4 w-96">
+          <div className="bg-wa-panel p-6 rounded-lg space-y-4 w-96">
             <h3 className="text-lg font-medium">Edit Schedule</h3>
             <form onSubmit={handleUpdate} className="space-y-3">
               <div>
@@ -363,7 +363,7 @@ export default function Scheduling() {
                 <textarea
                   value={edit.text}
                   onChange={(e) => setEdit({ ...edit, text: e.target.value })}
-                  className="w-full px-3 py-2 rounded bg-gray-700 text-white"
+                  className="w-full px-3 py-2 rounded bg-wa-hover text-white"
                 />
               </div>
               <div className="flex items-center space-x-2">
@@ -385,7 +385,7 @@ export default function Scheduling() {
                   onChange={(e) =>
                     setEdit({ ...edit, firstRunAt: e.target.value })
                   }
-                  className="w-full px-3 py-2 rounded bg-gray-700 text-white"
+                  className="w-full px-3 py-2 rounded bg-wa-hover text-white"
                 />
               </div>
               <div>
@@ -398,7 +398,7 @@ export default function Scheduling() {
                   onChange={(e) =>
                     setEdit({ ...edit, intervalMinutes: e.target.value })
                   }
-                  className="w-full px-3 py-2 rounded bg-gray-700 text-white"
+                  className="w-full px-3 py-2 rounded bg-wa-hover text-white"
                 />
               </div>
               <div className="flex items-center space-x-2">
@@ -416,7 +416,7 @@ export default function Scheduling() {
                 <button
                   type="button"
                   onClick={() => setEdit(null)}
-                  className="bg-gray-600 hover:bg-gray-700 px-3 py-1 rounded"
+                  className="bg-wa-hover hover:bg-wa-panel px-3 py-1 rounded"
                 >
                   Cancel
                 </button>

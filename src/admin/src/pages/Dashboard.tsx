@@ -60,27 +60,27 @@ export default function Dashboard() {
       <h1 className="text-2xl font-bold">Dashboard</h1>
       {health && (
         <div className="grid grid-cols-2 gap-4">
-          <div className="bg-gray-800 p-4 rounded-lg">
+          <div className="bg-wa-panel p-4 rounded-lg">
             <div className="text-lg font-medium">Session</div>
             <p>{health.session.ready ? "Ready" : "Not ready"}</p>
           </div>
-          <div className="bg-gray-800 p-4 rounded-lg">
+          <div className="bg-wa-panel p-4 rounded-lg">
             <div className="text-lg font-medium">Daily Usage</div>
             <p>
               {health.sentToday} / {health.dailyCap}
             </p>
           </div>
-          <div className="bg-gray-800 p-4 rounded-lg">
+          <div className="bg-wa-panel p-4 rounded-lg">
             <div className="text-lg font-medium">Minute Tokens</div>
             <p>{health.perMinAvailable} available</p>
           </div>
-          <div className="bg-gray-800 p-4 rounded-lg">
+          <div className="bg-wa-panel p-4 rounded-lg">
             <div className="text-lg font-medium">Headless</div>
             <p>{health.headless ? "Enabled" : "Disabled"}</p>
           </div>
         </div>
       )}
-      <div className="bg-gray-800 p-4 rounded-lg space-y-4">
+      <div className="bg-wa-panel p-4 rounded-lg space-y-4">
         <h2 className="text-lg font-medium">Quick Send</h2>
         <form onSubmit={handleSend} className="space-y-2">
           <div>
@@ -89,7 +89,7 @@ export default function Dashboard() {
               placeholder="E.164 Phone"
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
-              className="w-full px-3 py-2 rounded bg-gray-700 text-white"
+              className="w-full px-3 py-2 rounded bg-wa-hover text-white"
             />
           </div>
           <div>
@@ -97,7 +97,7 @@ export default function Dashboard() {
               placeholder="Message"
               value={text}
               onChange={(e) => setText(e.target.value)}
-              className="w-full px-3 py-2 rounded bg-gray-700 text-white"
+              className="w-full px-3 py-2 rounded bg-wa-hover text-white"
             />
           </div>
           <div className="flex items-center space-x-2">
@@ -111,7 +111,7 @@ export default function Dashboard() {
           </div>
           <button
             type="submit"
-            className="bg-green-600 hover:bg-green-700 px-4 py-2 rounded"
+            className="bg-wa-green hover:bg-wa-green/80 px-4 py-2 rounded text-wa-bg"
           >
             Send
           </button>
@@ -121,13 +121,13 @@ export default function Dashboard() {
       <div className="flex gap-4">
         <button
           onClick={handleSubscribe}
-          className="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded"
+          className="bg-wa-green hover:bg-wa-green/80 px-4 py-2 rounded text-wa-bg"
         >
           Subscribe to Push
         </button>
         <button
           onClick={() => testPush()}
-          className="bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded"
+          className="bg-wa-green hover:bg-wa-green/80 px-4 py-2 rounded text-wa-bg"
         >
           Test Push
         </button>

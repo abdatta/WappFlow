@@ -54,7 +54,7 @@ export default function Send() {
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-bold">Send Message</h1>
-      <div className="bg-gray-800 p-4 rounded-lg space-y-4 max-w-md">
+      <div className="bg-wa-panel p-4 rounded-lg space-y-4 max-w-md">
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block mb-1">Contact</label>
@@ -66,7 +66,7 @@ export default function Send() {
                 setSelected(null);
                 if (e.target.value) setShowAll(false);
               }}
-              className="w-full px-3 py-2 rounded bg-gray-700 text-white"
+              className="w-full px-3 py-2 rounded bg-wa-hover text-white"
             />
             {suggestions.length > 0 ? (
               <div className="mt-2 max-h-48 overflow-y-auto space-y-2">
@@ -78,7 +78,7 @@ export default function Send() {
                       setSelected(c);
                       setPhone(c.phone ? `${c.name} (${c.phone})` : c.name);
                     }}
-                    className="block w-full text-left bg-gray-700 hover:bg-gray-600 p-2 rounded"
+                    className="block w-full text-left bg-wa-hover hover:bg-wa-panel p-2 rounded"
                   >
                     <div className="font-medium">{c.name}</div>
                     {c.phone && (
@@ -98,7 +98,7 @@ export default function Send() {
               <button
                 type="button"
                 onClick={() => setShowAll(true)}
-                className="text-blue-400 text-sm mt-2"
+                className="text-wa-green text-sm mt-2"
               >
                 View all
               </button>
@@ -109,7 +109,7 @@ export default function Send() {
             <textarea
               value={text}
               onChange={(e) => setText(e.target.value)}
-              className="w-full px-3 py-2 rounded bg-gray-700 text-white"
+              className="w-full px-3 py-2 rounded bg-wa-hover text-white"
             />
           </div>
           <div className="flex items-center space-x-2">
@@ -123,7 +123,7 @@ export default function Send() {
           </div>
           <button
             type="submit"
-            className="bg-green-600 hover:bg-green-700 px-4 py-2 rounded"
+            className="bg-wa-green hover:bg-wa-green/80 px-4 py-2 rounded text-wa-bg"
           >
             Send
           </button>
