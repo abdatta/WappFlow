@@ -8,12 +8,13 @@ const dataDir = path.join(process.cwd(), "data");
 
 const defaults: Record<string, Json> = {
   "settings.json": {
-    headless: true,
+    headless: false,
     timezone: "America/Los_Angeles",
     rate: { perMin: 10, perDay: 200, warmup: true, firstRunAt: null },
     prefix: { text: "[wappbot]: ", defaultEnabled: true },
     vapid: { publicKey: "", privateKey: "" },
     topContactsN: 10,
+    contactsRefreshInterval: 3600,
   },
   "limits.json": {
     tokens: 10,
@@ -94,10 +95,22 @@ function ensureSettingsDefaults() {
   const file = path.join(dataDir, "settings.json");
   const current = readJsonSafe<Record<string, any>>(file);
   if (!current) return;
+
+  let updated = false;
   if (typeof current.topContactsN !== "number") {
     current.topContactsN = 10;
-    writeAtomic(file, JSON.stringify(current, null, 2));
     console.log("Updated settings.json with topContactsN");
+    updated = true;
+  }
+
+  if (typeof current.contactsRefreshInterval !== "number") {
+    current.contactsRefreshInterval = 3600;
+    console.log("Updated settings.json with contactsRefreshInterval");
+    updated = true;
+  }
+
+  if (updated) {
+    writeAtomic(file, JSON.stringify(current, null, 2));
   }
 }
 

@@ -1,23 +1,27 @@
-import { getContacts, saveContacts } from "./store.js";
+import { getContacts, saveContacts, getSettings } from "./store.js";
 import { Contact, ContactsFile } from "./types.js";
 import { WhatsAppDriver } from "./driver.js";
 
 export class ContactsCache {
   private contacts: Contact[] = [];
+  private lastRefreshed?: string;
   private refreshing = false;
   private sending = false;
   private driver: WhatsAppDriver;
+  private refreshInterval = 3600;
 
   constructor(driver: WhatsAppDriver) {
     this.driver = driver;
   }
 
   async init(): Promise<void> {
-    const file = await getContacts();
+    const [file, settings] = await Promise.all([getContacts(), getSettings()]);
     this.contacts = file.contacts.map((c) => ({
       name: c.name,
       phone: c.phone,
     }));
+    this.lastRefreshed = file.lastRefreshed;
+    this.refreshInterval = settings.contactsRefreshInterval ?? 3600;
     await this.refreshFromWeb();
   }
 
@@ -27,12 +31,22 @@ export class ContactsCache {
 
   async refreshFromWeb(): Promise<void> {
     if (this.sending || this.refreshing) return;
+    if (this.lastRefreshed) {
+      const last = new Date(this.lastRefreshed).getTime();
+      if (Date.now() - last < 1000 * this.refreshInterval) {
+        return;
+      }
+    }
     this.refreshing = true;
     try {
       const fresh = await this.driver.fetchContacts();
       if (fresh.length) {
         this.contacts = fresh;
-        const file: ContactsFile = { contacts: this.contacts };
+        this.lastRefreshed = new Date().toISOString();
+        const file: ContactsFile = {
+          contacts: this.contacts,
+          lastRefreshed: this.lastRefreshed,
+        };
         await saveContacts(file);
       }
     } catch (err) {
@@ -57,7 +71,10 @@ export class ContactsCache {
     } else {
       this.contacts.push(contact);
     }
-    const file: ContactsFile = { contacts: this.contacts };
+    const file: ContactsFile = {
+      contacts: this.contacts,
+      lastRefreshed: this.lastRefreshed,
+    };
     await saveContacts(file);
   }
 }
