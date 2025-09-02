@@ -41,6 +41,7 @@ export interface Settings {
   prefix: PrefixConfig;
   vapid: VapidConfig;
   topContactsN: 10 | 20;
+  contactsRefreshInterval?: number;
 }
 
 export interface Limits {
@@ -165,4 +166,5 @@ export interface Contact {
 
 export interface ContactsFile {
   contacts: Contact[];
+  lastRefreshed?: string;
 }
