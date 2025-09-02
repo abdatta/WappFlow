@@ -53,7 +53,7 @@ export class WhatsAppDriver extends EventEmitter {
         headless,
         args: ["--start-maximized"],
         viewport: { width: 1280, height: 800 },
-      }
+      },
     ));
     const [page] = browser.pages();
     this.page = page;
@@ -172,7 +172,7 @@ export class WhatsAppDriver extends EventEmitter {
           els.map((el) => {
             const name = (el as HTMLElement).getAttribute("title") || "";
             return { name };
-          })
+          }),
         );
 
         // Append new contacts preserving order
@@ -212,7 +212,7 @@ export class WhatsAppDriver extends EventEmitter {
    */
   async sendTextToContact(
     contact: Contact,
-    text: string
+    text: string,
   ): Promise<string | undefined> {
     if (contact.phone) {
       await this.sendText(contact.phone, text);
@@ -229,22 +229,13 @@ export class WhatsAppDriver extends EventEmitter {
     });
     await this.page.click(`span[title='${contact.name}']`);
     await this.page.waitForSelector(composerSelector, { timeout: 15000 });
-    const phone = await this.page.evaluate(() => {
-      const header = document.querySelector("header [data-testid]");
-      if (!header) return undefined;
-      const testId = header.getAttribute("data-testid") || "";
-      const m = testId.match(/(\d+)(@c\.us)?/);
-      if (m) return m[1];
-      const title = header.querySelector("span[title]") as HTMLElement | null;
-      const t = title?.getAttribute("title") || "";
-      if (/^\+?\d+$/.test(t)) return t;
-      return undefined;
-    });
+
     await delay(400 + Math.random() * 800);
     await this.page.keyboard.type(text);
     await this.page.keyboard.press("Enter");
     await delay(1000);
-    return phone || undefined;
+
+    return undefined;
   }
 
   /**

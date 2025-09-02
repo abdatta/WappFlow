@@ -37,32 +37,40 @@ export class Scheduler {
    * recurring jobs, initialise missing fields and run overdue
    * one‑off jobs.
    */
+  private recalculateNextRun(sched: Schedule, nowDt: Date): void {
+    if (!sched.intervalMinutes) {
+      if (sched.active && new Date(sched.firstRunAt) <= nowDt) {
+        sched.active = false;
+      }
+      sched.nextRunAt = sched.firstRunAt;
+    } else {
+      const firstRunAt = new Date(sched.firstRunAt);
+      const intervalMs = sched.intervalMinutes * 60000;
+      const nowMs = nowDt.getTime();
+      if (firstRunAt.getTime() > nowMs) {
+        sched.nextRunAt = sched.firstRunAt;
+        return;
+      }
+      const elapsedMs = nowMs - firstRunAt.getTime();
+      const intervalsPassed = Math.floor(elapsedMs / intervalMs);
+      const nextRunMs =
+        firstRunAt.getTime() + (intervalsPassed + 1) * intervalMs;
+      sched.nextRunAt = toIso(new Date(nextRunMs));
+    }
+  }
+
+  /**
+   * Normalise schedule objects after load: compute nextRunAt for
+   * recurring jobs, initialise missing fields and run overdue
+   * one‑off jobs.
+   */
   private async normalizeSchedules(): Promise<void> {
     const nowDt = now(this.tz);
     for (const sched of this.schedules) {
       // Fill missing optional properties
       sched.failures = sched.failures ?? 0;
       sched.lastRunAt = sched.lastRunAt ?? null;
-      // For one‑off schedules with no interval
-      if (!sched.intervalMinutes) {
-        if (sched.active && new Date(sched.firstRunAt) <= nowDt) {
-          // It should have been run but missed; mark as inactive and leave lastRunAt null
-          sched.active = false;
-        }
-        sched.nextRunAt = sched.firstRunAt;
-      } else {
-        // Recurring schedule; compute nextRunAt if missing or overdue
-        if (!sched.nextRunAt) {
-          sched.nextRunAt = sched.firstRunAt;
-        }
-        const intervalMs = sched.intervalMinutes * 60000;
-        let next = new Date(sched.nextRunAt);
-        // Bump nextRunAt until it's in the future plus small buffer
-        while (sched.active && next.getTime() <= nowDt.getTime() + 10000) {
-          next = new Date(next.getTime() + intervalMs);
-        }
-        sched.nextRunAt = toIso(next);
-      }
+      this.recalculateNextRun(sched, nowDt);
     }
     await this.persist();
   }
@@ -104,10 +112,37 @@ export class Scheduler {
    */
   private async tick(): Promise<void> {
     const nowDt = now(this.tz);
+    const scheduleTimeGraceMs = 60 * 1000; // 1 minute
     for (const sched of this.schedules) {
       if (!sched.active) continue;
       const next = new Date(sched.nextRunAt);
       if (next <= nowDt) {
+        const lateMs = nowDt.getTime() - next.getTime();
+        if (lateMs > scheduleTimeGraceMs) {
+          const alertMsg = `Scheduler: Skipped message for ${
+            sched.name || sched.phone
+          } due to delay of ${Math.round(
+            lateMs / 1000,
+          )}s. Will retry next tick.`;
+          try {
+            await this.sendFn({
+              name: "Me India (Vi)",
+              text: alertMsg,
+            });
+          } catch (e) {
+            console.error("Failed to send schedule-delay alert", e);
+          }
+          // For recurring jobs, advance to next scheduled time to avoid spamming alerts.
+          // For one-off jobs, do nothing, so it is retried on next tick.
+          if (sched.intervalMinutes) {
+            const nextDate = new Date(
+              next.getTime() + sched.intervalMinutes * 60000,
+            );
+            sched.nextRunAt = toIso(nextDate);
+            await this.persist();
+          }
+          continue;
+        }
         try {
           await this.sendFn({
             phone: sched.phone,
@@ -170,17 +205,7 @@ export class Scheduler {
       createdAt: toIso(now(this.tz)),
     };
     // Compute nextRunAt beyond now for recurring jobs
-    if (schedule.intervalMinutes) {
-      const intervalMs = schedule.intervalMinutes * 60000;
-      let next = new Date(schedule.nextRunAt);
-      while (
-        schedule.active &&
-        next.getTime() <= now(this.tz).getTime() + 10000
-      ) {
-        next = new Date(next.getTime() + intervalMs);
-      }
-      schedule.nextRunAt = toIso(next);
-    }
+    this.recalculateNextRun(schedule, now(this.tz));
     this.schedules.push(schedule);
     await this.persist();
     return schedule;
@@ -208,18 +233,7 @@ export class Scheduler {
       sched.intervalMinutes = clampInterval(updates.intervalMinutes);
     }
     // Recalculate nextRunAt after updating time or interval
-    const nowDt = now(this.tz);
-    const nextBase = new Date(sched.firstRunAt);
-    if (!sched.intervalMinutes) {
-      sched.nextRunAt = sched.firstRunAt;
-    } else {
-      const intervalMs = sched.intervalMinutes * 60000;
-      let next = new Date(sched.nextRunAt ?? sched.firstRunAt);
-      while (sched.active && next.getTime() <= nowDt.getTime() + 10000) {
-        next = new Date(next.getTime() + intervalMs);
-      }
-      sched.nextRunAt = toIso(next);
-    }
+    this.recalculateNextRun(sched, now(this.tz));
     await this.persist();
     return sched;
   }
