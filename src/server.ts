@@ -35,10 +35,18 @@ dotenv();
 const PORT = process.env.PORT ? parseInt(process.env.PORT) : 3030;
 const ADMIN_TOKEN = process.env.ADMIN_TOKEN || "";
 
+/**
+ * Main application entry point.
+ * This function orchestrates the setup of the entire backend service.
+ * It initializes settings, configures web push notifications, starts the
+ * WhatsApp driver, sets up rate limiting and task scheduling, and
+ * initializes the contact cache. Finally, it configures and starts the
+ * Express server, which exposes the API endpoints for interacting with the bot.
+ */
 async function main() {
-  // Load settings
+  // Load application settings from store.
   const settings = await getSettings();
-  // Configure web push
+  // Configure web-push service with VAPID keys for sending notifications.
   if (settings.vapid.publicKey && settings.vapid.privateKey) {
     webPush.setVapidDetails(
       "mailto:example@example.com",
@@ -46,22 +54,23 @@ async function main() {
       settings.vapid.privateKey,
     );
   }
-  // Initialise driver
+  // Initialize the WhatsApp driver, which controls the Playwright browser.
   const driver = new WhatsAppDriver(settings);
   await driver.init().catch((err) => {
     console.error("Driver init failed", err);
   });
-  // Initialise rate limiter
+  // Set up the rate limiter to control the frequency of outgoing messages.
   const limiter = new RateLimiter();
   await limiter.init();
-  // Initialise scheduler
+  // Initialize the scheduler for sending messages at specific times.
   const scheduler = new Scheduler();
   await scheduler.init();
-  // Initialise contacts cache
+  // Initialize the contacts cache to store and manage contact information.
   const contacts = new ContactsCache(driver);
   await contacts.init();
+  // Periodically refresh the contacts from WhatsApp Web.
   setInterval(() => contacts.refreshFromWeb(), 6 * 60 * 60 * 1000);
-  // Provide scheduler with send function that wraps driver and rate limiter
+  // Start the scheduler and provide it with the core message sending logic.
   scheduler.start(async ({ phone, name, text, disablePrefix }) => {
     await handleSend({ phone, name }, text, disablePrefix);
   });
@@ -70,7 +79,11 @@ async function main() {
   app.use(cors());
   app.use(express.json({ limit: "1mb" }));
 
-  // Authentication middleware: require bearer token for non‑GET API calls
+  // Simple authentication middleware.
+  // For all non-GET requests to the API, this middleware checks for a
+  // bearer token in the Authorization header. In a real production
+  // environment, this would be a more robust JWT or OAuth-based system.
+  // The authentication is currently commented out for ease of development.
   function auth(req: Request, res: Response, next: NextFunction) {
     if (req.method === "GET") return next();
     // const authHeader = req.headers['authorization'];
@@ -82,9 +95,12 @@ async function main() {
   app.use("/api", auth);
 
   /**
-   * Internal send handler used by both API and scheduler. Validates
-   * the phone number, enforces rate limits, applies prefix and
-   * calls the driver. Logs the attempt to sends.log.jsonl.
+   * Core message sending logic.
+   * This function is the central handler for sending all messages, whether
+   * triggered by an API call or by the scheduler. It performs phone number
+   * validation, applies a message prefix if configured, checks rate limits,
+   * and then calls the WhatsApp driver to actually send the message.
+   * It also logs every send attempt, whether successful or not.
    */
   async function handleSend(
     target: { phone?: string; name?: string },
@@ -92,7 +108,7 @@ async function main() {
     disablePrefix = false,
   ): Promise<void> {
     contacts.setSending(true);
-    // Validate phone if provided
+    // Validate the phone number format if one is provided.
     let e164: string | undefined;
     if (target.phone) {
       try {
@@ -101,21 +117,22 @@ async function main() {
         throw new Error("INVALID_PHONE");
       }
     }
-    // Prepend prefix if enabled globally and not disabled per message
+    // Prepend a configured prefix to the message, unless disabled for this send.
     const currentSettings = await getSettings();
     let body = text;
     if (currentSettings.prefix.defaultEnabled && !disablePrefix) {
       body = `${currentSettings.prefix.text}${text}`;
     }
-    // Rate limit
+    // Enforce rate limits before sending.
     const result = await limiter.consume();
     if (!result.allowed) {
       throw new Error(result.reason || "RATE_LIMIT");
     }
-    // Random extra delay after each send
+    // Add a random delay to mimic human behavior and reduce risk of being flagged.
     const extraDelay = randomDelaySeconds(8, 25) * 1000;
     try {
       if (e164) {
+        // If a valid phone number is available, send directly.
         await driver.sendText(e164, body);
         await appendSendLog(
           {
@@ -127,10 +144,12 @@ async function main() {
           driver,
         );
       } else if (target.name) {
+        // Otherwise, fall back to sending by contact name.
         const resolvedPhone = await driver.sendTextToContact(
           { name: target.name },
           body,
         );
+        // If sending by name resolved a phone number, update the contact cache.
         if (resolvedPhone) {
           await contacts.upsert({ name: target.name, phone: resolvedPhone });
         }
@@ -148,6 +167,7 @@ async function main() {
         throw new Error("NO_TARGET");
       }
     } catch (err) {
+      // Log any errors that occur during the send process.
       await appendSendLog(
         {
           ts: new Date().toISOString(),
@@ -161,13 +181,18 @@ async function main() {
       );
       throw err;
     } finally {
+      // Wait for the random delay to complete and then update sending status.
       await new Promise((resolve) => setTimeout(resolve, extraDelay));
       contacts.setSending(false);
     }
   }
 
   /**
-   * Health endpoint: returns information about session and limits.
+   * Health check endpoint.
+   * Provides a snapshot of the bot's current status, including the
+   * WhatsApp session state, rate limiting counters, and whether the
+   * browser is running in headless mode. This is useful for monitoring
+   * and debugging.
    */
   app.get("/api/health", async (req, res) => {
     const status = limiter.getStatus();
@@ -183,7 +208,11 @@ async function main() {
   });
 
   /**
-   * Send API: send a single message. Expects JSON body with phone and text.
+   * API endpoint for sending a single message.
+   * This endpoint accepts a JSON payload with the recipient (by phone or name)
+   * and the message text. It uses the `handleSend` function to process and
+   * send the message. It includes input validation using Zod to ensure
+   * the payload is correctly formatted.
    */
   app.post("/api/send", async (req, res) => {
     const schema = z
@@ -215,7 +244,9 @@ async function main() {
   });
 
   /**
-   * Contacts endpoints using the cached contacts list.
+   * Endpoints for accessing the contact cache.
+   * `/api/contacts/top` returns the most frequently contacted people.
+   * `/api/contacts/all` returns the entire list of known contacts.
    */
   app.get("/api/contacts/top", (req, res) => {
     const nParam = parseInt(String(req.query.n || ""), 10);
@@ -228,7 +259,9 @@ async function main() {
   });
 
   /**
-   * Push subscription endpoint. Stores a push subscription in subs.json.
+   * Endpoint for subscribing to web push notifications.
+   * The frontend can use this to register its push subscription, which is
+   * then stored for sending notifications about bot events (e.g., QR required).
    */
   app.post("/api/push/subscribe", async (req, res) => {
     const subscription = req.body;
@@ -236,7 +269,7 @@ async function main() {
       return res.status(400).json({ error: "Invalid subscription" });
     }
     const subsFile = await getSubs();
-    // Deduplicate by endpoint
+    // Avoid duplicate subscriptions.
     if (!subsFile.subs.find((s) => s.endpoint === subscription.endpoint)) {
       subsFile.subs.push(subscription);
       await saveSubs(subsFile);
@@ -245,7 +278,9 @@ async function main() {
   });
 
   /**
-   * Send a test push notification to all subscribers.
+   * Endpoint to send a test push notification.
+   * This allows an admin to verify that push notifications are correctly
+   * configured and working for all subscribed clients.
    */
   app.post("/api/push/test", async (req, res) => {
     const subsFile = await getSubs();
@@ -268,7 +303,10 @@ async function main() {
   });
 
   /**
-   * Create schedule.
+   * CRUD endpoints for managing scheduled messages.
+   * These endpoints allow for creating, listing, retrieving, updating, and
+   * deleting scheduled messages. They also provide controls for manually
+   * running, pausing, and resuming schedules.
    */
   app.post("/api/schedules", async (req, res) => {
     const schema = z
@@ -303,7 +341,7 @@ async function main() {
   });
 
   /**
-   * List schedules.
+   * List all scheduled messages.
    */
   app.get("/api/schedules", (req, res) => {
     const items = scheduler.list();
@@ -311,7 +349,7 @@ async function main() {
   });
 
   /**
-   * Get schedule by id.
+   * Get a single scheduled message by its ID.
    */
   app.get("/api/schedules/:id", (req, res) => {
     const sched = scheduler.get(req.params.id);
@@ -320,7 +358,7 @@ async function main() {
   });
 
   /**
-   * Update schedule.
+   * Update an existing scheduled message.
    */
   app.put("/api/schedules/:id", async (req, res) => {
     const id = req.params.id;
@@ -348,7 +386,7 @@ async function main() {
   });
 
   /**
-   * Delete schedule.
+   * Delete a scheduled message.
    */
   app.delete("/api/schedules/:id", async (req, res) => {
     const ok = await scheduler.delete(req.params.id);
@@ -357,7 +395,7 @@ async function main() {
   });
 
   /**
-   * Run schedule immediately.
+   * Trigger an immediate run of a scheduled message.
    */
   app.post("/api/schedules/:id/run", async (req, res) => {
     const ok = await scheduler.runNow(req.params.id);
@@ -367,7 +405,7 @@ async function main() {
   });
 
   /**
-   * Pause schedule.
+   * Pause a scheduled message, preventing it from running.
    */
   app.post("/api/schedules/:id/pause", async (req, res) => {
     const ok = await scheduler.pause(req.params.id);
@@ -375,7 +413,7 @@ async function main() {
     res.json({ ok: true });
   });
   /**
-   * Resume schedule.
+   * Resume a paused scheduled message.
    */
   app.post("/api/schedules/:id/resume", async (req, res) => {
     const ok = await scheduler.resume(req.params.id);
@@ -384,10 +422,11 @@ async function main() {
   });
 
   /**
-   * Endpoint to fetch latest QR image. Returns a PNG file. The
-   * runtime/qr_latest.png will be updated by the driver when a QR
-   * relink is required. We set Cache‑Control to no‑cache to ensure
-   * the client always gets the latest image.
+   * Endpoint to serve the latest QR code image.
+   * When the WhatsApp driver detects that a QR code scan is needed, it saves
+   * the QR code as an image. This endpoint allows the admin UI to fetch and
+   * display that image. Cache-Control headers are set to prevent caching,
+   * ensuring the user always sees the most recent QR code.
    */
   app.get("/qr/latest", (req, res) => {
     const qrPath = path.join(process.cwd(), "runtime", "qr_latest.png");
@@ -398,9 +437,10 @@ async function main() {
   });
 
   /**
-   * Serve the admin UI. If the dist directory does not exist the
-   * user will see a 404. To build the admin UI run `npm run
-   * admin:build` in the root.
+   * Serves the static files for the admin UI.
+   * The admin UI is a separate single-page application (SPA) built with Vite.
+   * This middleware serves the compiled `dist` directory of the admin UI
+   * when a user navigates to `/admin`.
    */
   const adminDir = path.join(process.cwd(), "src", "admin", "dist");
   app.use("/admin", express.static(adminDir));
@@ -410,13 +450,21 @@ async function main() {
   });
 
   /**
-   * Driver event listeners to forward notifications via web push.
+   * Event listeners for the WhatsApp driver.
+   * These listeners respond to events from the driver (like needing a QR scan)
+   * and trigger push notifications to subscribed clients, keeping the admin
+   * informed of the bot's status.
    */
   driver.on("qr_required", () => pushNotification("qr_required"));
   driver.on("relinked", () => pushNotification("relinked"));
   driver.on("offline", () => pushNotification("offline"));
   driver.on("error", (err) => pushNotification("error", String(err)));
 
+  /**
+   * Sends a push notification to all subscribed clients.
+   * This function constructs a notification payload based on the event type
+   * and sends it to all registered push subscriptions.
+   */
   async function pushNotification(event: string, extra?: string) {
     const subsFile = await getSubs();
     let title = "";

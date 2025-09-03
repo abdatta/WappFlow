@@ -8,29 +8,38 @@ import { getLimits, saveLimits, getSettings, saveSettings } from "./store.js";
 import { Limits, Settings, LimitCheckResult } from "./types.js";
 import { now } from "./utils.js";
 
+/**
+ * Implements a rate limiter using a token bucket algorithm.
+ * This class is responsible for enforcing both per-minute and per-day
+ * message sending limits. It supports a "warm-up" period where limits
+ * are gradually increased over the first few days of operation to reduce
+ * the risk of being flagged as spam. The state of the rate limiter,
+ * including token counts and daily usage, is persisted to a JSON file.
+ */
 export class RateLimiter {
   private settings!: Settings;
   private limits!: Limits;
+  // The effective per-minute and per-day caps, adjusted for warm-up.
   private perMin!: number;
   private perDay!: number;
 
   /**
-   * Initialise the rate limiter by loading settings and limits from
-   * disk. This should be called once on startup. If the firstRunAt
-   * property is null then it will be initialised with the current
-   * timestamp and persisted.
+   * Initializes the rate limiter.
+   * This method loads the settings and current limits from the persistent
+   * store. If this is the first time the bot is run with warm-up enabled,
+   * it records the start time to calculate the warm-up tier.
    */
   async init(): Promise<void> {
     this.settings = await getSettings();
     this.limits = await getLimits();
-    // Initialise firstRunAt on first run if warmup is enabled
+    // If warm-up is enabled and this is the first run, set the `firstRunAt` timestamp.
     if (this.settings.rate.warmup && !this.settings.rate.firstRunAt) {
       const nowIso = new Date().toISOString();
       this.settings.rate.firstRunAt = nowIso;
       await saveSettings(this.settings);
     }
     this.recomputeCaps();
-    // Ensure updatedAt is set
+    // Initialize timestamps if they are not already set.
     if (!this.limits.updatedAt) {
       this.limits.updatedAt = Date.now();
     }
@@ -41,19 +50,21 @@ export class RateLimiter {
   }
 
   /**
-   * Recompute per‑minute and per‑day caps based on warmup settings
-   * and firstRunAt. This is called on init and when the day
-   * changes.
+   * Recalculates the sending caps based on the warm-up schedule.
+   * If warm-up is enabled, this method adjusts the `perMin` and `perDay`
+   * limits based on how many days the bot has been running. This helps
+   * to build a good sending reputation.
    */
   private recomputeCaps(): void {
     const rc = this.settings.rate;
-    // Default caps from settings
+    // Start with the default caps from settings.
     let perMin = rc.perMin;
     let perDay = rc.perDay;
+    // If in a warm-up period, apply stricter limits.
     if (rc.warmup && rc.firstRunAt) {
       const first = new Date(rc.firstRunAt);
       const diffMs = now(this.settings.timezone).getTime() - first.getTime();
-      const days = Math.floor(diffMs / 86400000) + 1; // day count starting at 1
+      const days = Math.floor(diffMs / 86400000) + 1; // Day 1 is the first day.
       if (days <= 2) {
         perMin = Math.min(perMin, 3);
         perDay = Math.min(perDay, 40);
@@ -61,25 +72,28 @@ export class RateLimiter {
         perMin = Math.min(perMin, 5);
         perDay = Math.min(perDay, 80);
       } else {
-        // full caps
+        // After the warm-up period, the full caps are used.
       }
     }
     this.perMin = perMin;
     this.perDay = perDay;
-    // When caps change we should also clamp tokens/sentToday
+    // If the caps have been reduced, ensure the current token and usage counts
+    // do not exceed the new caps.
     if (this.limits.tokens > this.perMin) this.limits.tokens = this.perMin;
     if (this.limits.sentToday > this.perDay)
       this.limits.sentToday = this.perDay;
   }
 
   /**
-   * Refill tokens based on time elapsed. Uses a constant refill rate
-   * of perMin tokens per minute.
+   * Refills the token bucket based on the time elapsed since the last refill.
+   * The number of tokens added is proportional to the elapsed time, ensuring
+   * a smooth and continuous refill rate up to the `perMin` cap.
    */
   private refill(): void {
     const nowMs = Date.now();
     const elapsed = nowMs - this.limits.updatedAt;
     if (elapsed <= 0) return;
+    // Calculate how many tokens to add based on the per-minute rate.
     const tokensToAdd = (this.perMin / 60000) * elapsed;
     this.limits.tokens = Math.min(
       this.perMin,
@@ -89,8 +103,10 @@ export class RateLimiter {
   }
 
   /**
-   * Reset daily counters when the day changes. Called before
-   * processing tokens. Resets sentToday and tokens to full bucket.
+   * Checks if the day has changed and resets the daily counters if so.
+   * This is crucial for enforcing the `perDay` limit. When a new day
+   * starts, the `sentToday` count is reset to zero, and the token bucket
+   * is refilled to its maximum capacity.
    */
   private checkDayChange(): void {
     const tzNow = now(this.settings.timezone);
@@ -99,16 +115,19 @@ export class RateLimiter {
       this.limits.today = currentDay;
       this.limits.sentToday = 0;
       this.recomputeCaps();
-      // Reset tokens to full for the new day
+      // Reset the token bucket to full for the new day.
       this.limits.tokens = this.perMin;
     }
   }
 
   /**
-   * Attempt to consume one token and increment daily usage. Returns
-   * an object indicating whether sending is allowed. When allowed
-   * equals false the reason field will contain a human friendly
-   * explanation.
+   * Attempts to consume one or more tokens from the bucket.
+   * This is the main method called before sending a message. It checks if
+   * both the daily and per-minute limits would be respected. If allowed,
+   * it decrements the token count and increments the daily sent count.
+   *
+   * @returns A `LimitCheckResult` object indicating if the send is allowed
+   *          and, if not, the reason for the denial.
    */
   async consume(count: number = 1): Promise<LimitCheckResult> {
     this.checkDayChange();
@@ -119,7 +138,7 @@ export class RateLimiter {
     if (this.limits.tokens < count) {
       return { allowed: false, reason: "Rate limit exceeded" };
     }
-    // Consume tokens and increment counts
+    // If allowed, update the counts and save the new state.
     this.limits.tokens -= count;
     this.limits.sentToday += count;
     await saveLimits(this.limits);
@@ -127,7 +146,9 @@ export class RateLimiter {
   }
 
   /**
-   * Get current token availability and caps without consuming.
+   * Returns the current status of the rate limiter.
+   * This provides a snapshot of the current token count, daily usage,
+   * and the active rate caps, which is useful for monitoring and UI display.
    */
   getStatus() {
     this.checkDayChange();

@@ -39,28 +39,38 @@ export class WhatsAppDriver extends EventEmitter {
   }
 
   /**
-   * Launch the browser and prepare the WhatsApp Web session. In
-   * production this would wait for the chat list to appear,
-   * capture QR codes, click through banners and so on. Here we
-   * simply open WhatsApp Web and assume readiness after a delay.
+   * Initializes the Playwright browser instance and sets up a persistent context.
+   * A persistent context is used to maintain the WhatsApp Web session, including
+   * login state, by storing cookies and other session data in a user data directory.
+   * This avoids the need to scan the QR code on every launch.
+   *
+   * In a production environment, this method would also include more robust
+   * logic to handle various states of the WhatsApp Web interface, such as
+   * detecting if a QR code is required, handling loading screens, and confirming
+   * that the chat interface is fully loaded.
    */
   async init(): Promise<void> {
     const headless = this.settings.headless;
+    // The user data directory is crucial for session persistence.
     const userDataDir = path.join(process.cwd(), "profiles", "whatsapp");
     const browser = (this.browser = await chromium.launchPersistentContext(
       userDataDir,
       {
         headless,
+        // These arguments are recommended for running browsers in automated environments.
         args: ["--start-maximized"],
+        // A standard viewport size is set to ensure consistent rendering.
         viewport: { width: 1280, height: 800 },
       },
     ));
     const [page] = browser.pages();
     this.page = page;
-    // Navigate to WhatsApp Web home page
+    // Navigate to WhatsApp Web home page.
     try {
       await page.goto("https://web.whatsapp.com");
-      // In this stub we don't implement QR detection; we mark ready after 5 seconds
+      // In this simplified example, we assume the session is ready after a fixed delay.
+      // A real implementation would wait for a specific element that indicates
+      // the chat interface is loaded, and would handle QR code scanning.
       await delay(5000);
       this.session.ready = true;
       this.session.lastReadyAt = now(this.settings.timezone).toISOString();
@@ -90,26 +100,31 @@ export class WhatsAppDriver extends EventEmitter {
   }
 
   /**
-   * Send a text message to the specified E.164 phone number. This
-   * implementation navigates to a send URL and simulates a key
-   * press. It deliberately uses generic selectors and waits to
-   * reduce flakiness. In a real production environment more robust
-   * selectors and error handling would be required.
+   * Sends a text message to a given phone number.
+   * This method constructs a `wa.me` style URL to open a chat directly with the
+   * specified phone number. This is generally more reliable than searching for
+   * a contact by name.
+   *
+   * The implementation includes delays to mimic human-like interaction and
+   * waits for the message composer to be ready before sending the message.
+   * After sending, it switches back to the "Me" chat to avoid leaving a
+   * sensitive chat open.
    */
   async sendText(phone: string, text: string): Promise<void> {
     if (!this.page) throw new Error("Driver not initialised");
     await this.ensureReady();
     const encoded = encodeURIComponent(text);
+    // This URL format opens a chat with the specified phone number.
     const url = `https://web.whatsapp.com/send?phone=${phone}&text=${encoded}`;
     await this.page.goto(url);
-    // Wait for composer
+    // Wait for the message composer to appear before trying to send.
     const composerSelector = 'div[contenteditable="true"][data-tab]';
     await this.page.waitForSelector(composerSelector, { timeout: 15000 });
-    // Small random delay
+    // A small random delay can help avoid detection of automation.
     await delay(400 + Math.random() * 800);
-    // Press enter to send
+    // Pressing 'Enter' sends the message.
     await this.page.keyboard.press("Enter");
-    // Confirm bubble by waiting a bit
+    // A short delay to allow the message to be visually sent in the UI.
     await delay(1000);
     await this.switchToMeChat();
   }
@@ -132,8 +147,11 @@ export class WhatsAppDriver extends EventEmitter {
         timeout: 15000,
       });
 
-      // Discover the runtime class names for contact title spans so we can
-      // build a stable selector regardless of obfuscation.
+      // To make the selector for contact names robust against WhatsApp's
+      // obfuscated and frequently changing class names, we first find a
+      // known element (`span[title]`) and then get its dynamically
+      // generated class names at runtime. This allows us to build a
+      // selector that will work even if the class names change.
       const classNames = await this.page.evaluate(() => {
         const el = document.querySelector("span[title]");
         return el ? Array.from(el.classList) : [];
@@ -141,7 +159,9 @@ export class WhatsAppDriver extends EventEmitter {
       const nameSelector =
         "span[title]" + classNames.map((c) => `.${c}`).join("");
 
-      // Scroll through the contact list to ensure all contacts are loaded.
+      // The contact list is in a scrollable container. To get all contacts,
+      // we need to repeatedly scroll down. This logic finds the scrollable
+      // parent element to automate the scrolling.
       const scrollSelector = await this.page.$eval(nameSelector, (element) => {
         let parent: HTMLElement | null = element.parentElement;
         while (parent) {
@@ -168,6 +188,9 @@ export class WhatsAppDriver extends EventEmitter {
       const seen = new Set<string>();
       const contacts: Contact[] = [];
 
+      // This loop scrolls through the contact list, scraping the names
+      // of the contacts that appear. It continues until no new contacts
+      // can be loaded by scrolling.
       while (true) {
         const batch: Contact[] = await this.page.$$eval(nameSelector, (els) =>
           els.map((el) => {
@@ -176,7 +199,7 @@ export class WhatsAppDriver extends EventEmitter {
           }),
         );
 
-        // Append new contacts preserving order
+        // Append new contacts to the list, avoiding duplicates.
         for (const c of batch) {
           if (!seen.has(c.name)) {
             seen.add(c.name);
@@ -184,7 +207,8 @@ export class WhatsAppDriver extends EventEmitter {
           }
         }
 
-        // Attempt to scroll down; break when we've reached the end
+        // Attempt to scroll down within the scrollable container.
+        // The loop breaks if scrolling does not reveal new content.
         const scrolled = await this.page
           .$eval(scrollSelector, (el) => {
             const { scrollTop, scrollHeight, clientHeight } = el as HTMLElement;
@@ -208,29 +232,40 @@ export class WhatsAppDriver extends EventEmitter {
   }
 
   /**
-   * Send a text message to a contact by phone number if available,
-   * otherwise fall back to searching by the contact's display name.
+   * Sends a text message to a contact.
+   * If the contact has a phone number associated, it uses the `sendText` method
+   * for a more direct and reliable send. If not, it falls back to searching
+   * for the contact by their display name in the WhatsApp search bar,
+   * clicking the search result, and then sending the message.
+   *
+   * @returns The phone number used to send the message, or `undefined` if
+   *          sent via name search.
    */
   async sendTextToContact(
     contact: Contact,
     text: string,
   ): Promise<string | undefined> {
+    // Prefer sending via phone number if available.
     if (contact.phone) {
       await this.sendText(contact.phone, text);
       return contact.phone;
     }
+    // Fallback to searching by name.
     if (!this.page) throw new Error("Driver not initialised");
     await this.ensureReady();
     const searchSelector = "div[contenteditable='true'][data-tab='3']";
     const composerSelector = "div[contenteditable='true'][data-tab]";
+    // Search for the contact by name.
     await this.page.click(searchSelector);
     await this.page.fill(searchSelector, contact.name);
     await this.page.waitForSelector(`span[title='${contact.name}']`, {
       timeout: 15000,
     });
+    // Click the contact in the search results to open the chat.
     await this.page.click(`span[title='${contact.name}']`);
     await this.page.waitForSelector(composerSelector, { timeout: 15000 });
 
+    // Type and send the message.
     await delay(400 + Math.random() * 800);
     await this.page.keyboard.type(text);
     await this.page.keyboard.press("Enter");
@@ -241,14 +276,18 @@ export class WhatsAppDriver extends EventEmitter {
   }
 
   /**
-   * Switch to the chat with myself. This is used to reset
-   * the view after sending a message, to prevent accidental reads from other chats.
+   * Switches the active chat to the "Me" contact (chatting with yourself).
+   * This is a crucial cleanup step after sending a message. It ensures that
+   * the bot does not leave a sensitive conversation open on the screen.
+   * It also provides a consistent state for the next operation.
    */
   private async switchToMeChat(): Promise<void> {
     if (!this.page) return;
     try {
       const searchSelector = "div[contenteditable='true'][data-tab='3']";
       const contactName = this.settings.selfContactName;
+      // The search input is cleared before typing the name to ensure
+      // a clean search.
       await this.page.click(searchSelector);
       await this.page.fill(searchSelector, ""); // Clear search
       await this.page.fill(searchSelector, contactName);

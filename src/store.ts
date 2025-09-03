@@ -19,12 +19,27 @@ import { WhatsAppDriver } from "./driver.js";
 
 const DATA_DIR = path.join(process.cwd(), "data");
 
+/**
+ * A generic function to read and parse a JSON file from the data directory.
+ * It abstracts the file system access and JSON parsing, providing a typed
+ * object as a result.
+ * @param fileName The name of the JSON file to read (e.g., "settings.json").
+ * @returns A promise that resolves to the parsed JSON object.
+ */
 async function readFileJson<T>(fileName: string): Promise<T> {
   const filePath = path.join(DATA_DIR, fileName);
   const data = await fs.readFile(filePath, { encoding: "utf8" });
   return JSON.parse(data) as T;
 }
 
+/**
+ * A generic function to write a JSON object to a file in the data directory.
+ * This function implements an atomic write operation by first writing to a
+ * temporary file and then renaming it. This ensures that even if the process
+ * crashes during the write, the original file is not left in a corrupted state.
+ * @param fileName The name of the JSON file to write to.
+ * @param obj The object to serialize and write.
+ */
 async function writeFileJson<T>(fileName: string, obj: T): Promise<void> {
   const filePath = path.join(DATA_DIR, fileName);
   const tmpPath = `${filePath}.tmp`;
@@ -90,9 +105,13 @@ export async function saveContacts(file: ContactsFile): Promise<void> {
 }
 
 /**
- * Append a line of JSON to the send log. Each call writes one
- * JSON object on its own line. Failures here should not crash
- * the process as the log is non‑critical.
+ * Appends a log entry to the `sends.log.jsonl` file.
+ * This log file uses the JSON Lines format, where each line is a separate
+ * JSON object. This format is efficient for append-only logs. The function
+ * also sends a notification to the "Me" contact in WhatsApp with the status
+ * of the send operation, providing real-time feedback.
+ * @param entry The log entry to append.
+ * @param driver An optional `WhatsAppDriver` instance to send a status notification.
  */
 export async function appendSendLog(
   entry: SendLogEntry,
@@ -102,6 +121,7 @@ export async function appendSendLog(
   const line = JSON.stringify(entry) + "\n";
   try {
     await fs.appendFile(filePath, line, { encoding: "utf8" });
+    // If a driver is provided, send a real-time notification about the send status.
     if (driver) {
       const status = entry.result.toUpperCase();
       const target = entry.name || entry.phone || "Unknown";
@@ -111,12 +131,14 @@ export async function appendSendLog(
       } else {
         logMsg += `Send to ${target} failed: ${entry.error}`;
       }
+      // The notification is sent to the configured "self" contact.
       await driver.sendTextToContact(
         { name: driver.settings.selfContactName },
         logMsg,
       );
     }
   } catch (err) {
+    // Failures in logging should not crash the application.
     console.error("Failed to write send log:", err);
   }
 }
