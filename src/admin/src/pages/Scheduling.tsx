@@ -17,7 +17,7 @@ interface Schedule {
   phone?: string;
   name?: string;
   text: string;
-  disablePrefix: boolean;
+  enablePrefix: boolean;
   firstRunAt: string;
   nextRunAt: string;
   intervalMinutes: number | null;
@@ -30,9 +30,10 @@ export default function Scheduling() {
   const [form, setForm] = useState({
     phone: "",
     text: "",
-    disablePrefix: false,
+    enablePrefix: false,
     firstRunAt: "",
-    intervalMinutes: "" as string | number,
+    intervalValue: "" as string | number,
+    intervalUnit: "minutes" as "minutes" | "hours" | "days",
     active: true,
   });
   const [selected, setSelected] = useState<Contact | null>(null);
@@ -42,9 +43,10 @@ export default function Scheduling() {
   const [edit, setEdit] = useState<{
     id: string;
     text: string;
-    disablePrefix: boolean;
+    enablePrefix: boolean;
     firstRunAt: string;
-    intervalMinutes: string | number;
+    intervalValue: string | number;
+    intervalUnit: "minutes" | "hours" | "days";
     active: boolean;
   } | null>(null);
   const [status, setStatus] = useState<string | null>(null);
@@ -81,7 +83,7 @@ export default function Scheduling() {
     try {
       const payload: any = {
         text: form.text,
-        disablePrefix: form.disablePrefix,
+        enablePrefix: form.enablePrefix,
         active: form.active,
       };
       if (selected) {
@@ -94,16 +96,24 @@ export default function Scheduling() {
       }
       if (form.firstRunAt)
         payload.firstRunAt = new Date(form.firstRunAt).toISOString();
-      if (form.intervalMinutes)
-        payload.intervalMinutes = Number(form.intervalMinutes);
+      if (form.intervalValue) {
+        const mult =
+          form.intervalUnit === "hours"
+            ? 60
+            : form.intervalUnit === "days"
+              ? 1440
+              : 1;
+        payload.intervalMinutes = Number(form.intervalValue) * mult;
+      }
       await createSchedule(payload);
       setStatus("Schedule created");
       setForm({
         phone: "",
         text: "",
-        disablePrefix: false,
+        enablePrefix: false,
         firstRunAt: "",
-        intervalMinutes: "",
+        intervalValue: "",
+        intervalUnit: "minutes",
         active: true,
       });
       setSelected(null);
@@ -134,16 +144,30 @@ export default function Scheduling() {
     if (!edit) return;
     const payload: any = {
       text: edit.text,
-      disablePrefix: edit.disablePrefix,
+      enablePrefix: edit.enablePrefix,
       active: edit.active,
     };
     if (edit.firstRunAt)
       payload.firstRunAt = new Date(edit.firstRunAt).toISOString();
-    if (edit.intervalMinutes)
-      payload.intervalMinutes = Number(edit.intervalMinutes);
+    if (edit.intervalValue) {
+      const mult =
+        edit.intervalUnit === "hours"
+          ? 60
+          : edit.intervalUnit === "days"
+            ? 1440
+            : 1;
+      payload.intervalMinutes = Number(edit.intervalValue) * mult;
+    }
     await updateSchedule(edit.id, payload);
     setEdit(null);
     refresh();
+  }
+
+  function formatInterval(mins: number | null) {
+    if (!mins) return "None";
+    if (mins % 1440 === 0) return `${mins / 1440} day(s)`;
+    if (mins % 60 === 0) return `${mins / 60} hour(s)`;
+    return `${mins} minute(s)`;
   }
 
   return (
@@ -217,13 +241,13 @@ export default function Scheduling() {
           <div className="flex items-center space-x-2">
             <input
               type="checkbox"
-              checked={form.disablePrefix}
-              id="createDisablePrefix"
+              checked={form.enablePrefix}
+              id="createEnablePrefix"
               onChange={(e) =>
-                setForm({ ...form, disablePrefix: e.target.checked })
+                setForm({ ...form, enablePrefix: e.target.checked })
               }
             />
-            <label htmlFor="createDisablePrefix">Disable prefix</label>
+            <label htmlFor="createEnablePrefix">Enable prefix</label>
           </div>
           <div>
             <label className="block mb-1">First run (local)</label>
@@ -235,17 +259,29 @@ export default function Scheduling() {
             />
           </div>
           <div>
-            <label className="block mb-1">Interval (minutes, min 60)</label>
-            <input
-              type="number"
-              min="0"
-              step="60"
-              value={form.intervalMinutes}
-              onChange={(e) =>
-                setForm({ ...form, intervalMinutes: e.target.value })
-              }
-              className="w-full px-3 py-2 rounded bg-wa-hover text-white"
-            />
+            <label className="block mb-1">Interval</label>
+            <div className="flex space-x-2">
+              <input
+                type="number"
+                min="0"
+                value={form.intervalValue}
+                onChange={(e) =>
+                  setForm({ ...form, intervalValue: e.target.value })
+                }
+                className="w-full px-3 py-2 rounded bg-wa-hover text-white"
+              />
+              <select
+                value={form.intervalUnit}
+                onChange={(e) =>
+                  setForm({ ...form, intervalUnit: e.target.value as any })
+                }
+                className="px-2 py-2 rounded bg-wa-hover text-white"
+              >
+                <option value="minutes">Minutes</option>
+                <option value="hours">Hours</option>
+                <option value="days">Days</option>
+              </select>
+            </div>
           </div>
           <div className="flex items-center space-x-2">
             <input
@@ -291,13 +327,13 @@ export default function Scheduling() {
                     {s.text}
                   </td>
                   <td className="px-3 py-2 whitespace-nowrap">
-                    {s.disablePrefix ? "Off" : "On"}
+                    {s.enablePrefix ? "On" : "Off"}
                   </td>
                   <td className="px-3 py-2 whitespace-nowrap">
                     {new Date(s.nextRunAt).toLocaleString()}
                   </td>
                   <td className="px-3 py-2 whitespace-nowrap">
-                    {s.intervalMinutes ?? "None"}
+                    {formatInterval(s.intervalMinutes)}
                   </td>
                   <td className="px-3 py-2 whitespace-nowrap">
                     {s.active ? "Yes" : "No"}
@@ -308,9 +344,22 @@ export default function Scheduling() {
                         setEdit({
                           id: s.id,
                           text: s.text,
-                          disablePrefix: s.disablePrefix,
+                          enablePrefix: s.enablePrefix,
                           firstRunAt: s.firstRunAt,
-                          intervalMinutes: s.intervalMinutes ?? "",
+                          intervalValue: s.intervalMinutes
+                            ? s.intervalMinutes % 1440 === 0
+                              ? s.intervalMinutes / 1440
+                              : s.intervalMinutes % 60 === 0
+                                ? s.intervalMinutes / 60
+                                : s.intervalMinutes
+                            : "",
+                          intervalUnit: s.intervalMinutes
+                            ? s.intervalMinutes % 1440 === 0
+                              ? "days"
+                              : s.intervalMinutes % 60 === 0
+                                ? "hours"
+                                : "minutes"
+                            : "minutes",
                           active: s.active,
                         })
                       }
@@ -369,13 +418,13 @@ export default function Scheduling() {
               <div className="flex items-center space-x-2">
                 <input
                   type="checkbox"
-                  checked={edit.disablePrefix}
-                  id="editDisablePrefix"
+                  checked={edit.enablePrefix}
+                  id="editEnablePrefix"
                   onChange={(e) =>
-                    setEdit({ ...edit, disablePrefix: e.target.checked })
+                    setEdit({ ...edit, enablePrefix: e.target.checked })
                   }
                 />
-                <label htmlFor="editDisablePrefix">Disable prefix</label>
+                <label htmlFor="editEnablePrefix">Enable prefix</label>
               </div>
               <div>
                 <label className="block mb-1">First run (local)</label>
@@ -389,17 +438,29 @@ export default function Scheduling() {
                 />
               </div>
               <div>
-                <label className="block mb-1">Interval (minutes)</label>
-                <input
-                  type="number"
-                  min="0"
-                  step="60"
-                  value={edit.intervalMinutes}
-                  onChange={(e) =>
-                    setEdit({ ...edit, intervalMinutes: e.target.value })
-                  }
-                  className="w-full px-3 py-2 rounded bg-wa-hover text-white"
-                />
+                <label className="block mb-1">Interval</label>
+                <div className="flex space-x-2">
+                  <input
+                    type="number"
+                    min="0"
+                    value={edit.intervalValue}
+                    onChange={(e) =>
+                      setEdit({ ...edit, intervalValue: e.target.value })
+                    }
+                    className="w-full px-3 py-2 rounded bg-wa-hover text-white"
+                  />
+                  <select
+                    value={edit.intervalUnit}
+                    onChange={(e) =>
+                      setEdit({ ...edit, intervalUnit: e.target.value as any })
+                    }
+                    className="px-2 py-2 rounded bg-wa-hover text-white"
+                  >
+                    <option value="minutes">Minutes</option>
+                    <option value="hours">Hours</option>
+                    <option value="days">Days</option>
+                  </select>
+                </div>
               </div>
               <div className="flex items-center space-x-2">
                 <input

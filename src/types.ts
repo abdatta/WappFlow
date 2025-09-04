@@ -110,7 +110,7 @@ export interface SendRequestDto {
   phone?: string;
   name?: string;
   text: string;
-  disablePrefix?: boolean;
+  enablePrefix?: boolean;
   idempotencyKey?: string;
 }
 
@@ -122,7 +122,7 @@ export interface ScheduleDto {
   phone?: string;
   name?: string;
   text: string;
-  disablePrefix?: boolean;
+  enablePrefix?: boolean;
   firstRunAt?: string | null;
   intervalMinutes?: number | null;
   active?: boolean;
@@ -142,8 +142,8 @@ export interface Schedule {
   name?: string;
   /** The text of the message to be sent. */
   text: string;
-  /** If true, the default prefix will not be applied to this message. */
-  disablePrefix: boolean;
+  /** If true, the default prefix will be applied to this message. */
+  enablePrefix: boolean;
   /** The ISO timestamp for the first time the message should be sent. */
   firstRunAt: string;
   /** The ISO timestamp for the next scheduled run. */
@@ -156,6 +156,8 @@ export interface Schedule {
   lastRunAt: string | null;
   /** A counter for the number of consecutive times this schedule has failed to run. */
   failures: number;
+  /** Number of times this schedule was skipped due to delay. */
+  missedRuns: number;
   /** The ISO timestamp when the schedule was created. */
   createdAt: string;
 }

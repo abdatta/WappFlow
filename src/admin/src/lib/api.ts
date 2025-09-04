@@ -33,7 +33,7 @@ export async function sendMessage(data: {
   phone?: string;
   name?: string;
   text: string;
-  disablePrefix?: boolean;
+  enablePrefix?: boolean;
 }) {
   const res = await instance.post("/send", data);
   return res.data;

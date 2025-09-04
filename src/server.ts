@@ -71,8 +71,8 @@ async function main() {
   // Periodically refresh the contacts from WhatsApp Web.
   setInterval(() => contacts.refreshFromWeb(), 6 * 60 * 60 * 1000);
   // Start the scheduler and provide it with the core message sending logic.
-  scheduler.start(async ({ phone, name, text, disablePrefix }) => {
-    await handleSend({ phone, name }, text, disablePrefix);
+  scheduler.start(async ({ phone, name, text, enablePrefix }) => {
+    await handleSend({ phone, name }, text, enablePrefix);
   });
 
   const app = express();
@@ -105,7 +105,7 @@ async function main() {
   async function handleSend(
     target: { phone?: string; name?: string },
     text: string,
-    disablePrefix = false,
+    enablePrefix = false,
   ): Promise<void> {
     contacts.setSending(true);
     // Validate the phone number format if one is provided.
@@ -120,7 +120,7 @@ async function main() {
     // Prepend a configured prefix to the message, unless disabled for this send.
     const currentSettings = await getSettings();
     let body = text;
-    if (currentSettings.prefix.defaultEnabled && !disablePrefix) {
+    if (currentSettings.prefix.defaultEnabled || enablePrefix) {
       body = `${currentSettings.prefix.text}${text}`;
     }
     // Enforce rate limits before sending.
@@ -220,7 +220,7 @@ async function main() {
         phone: z.string().optional(),
         name: z.string().optional(),
         text: z.string(),
-        disablePrefix: z.boolean().optional(),
+        enablePrefix: z.boolean().optional(),
         idempotencyKey: z.string().optional(),
       })
       .refine((d) => d.phone || d.name, {
@@ -233,9 +233,9 @@ async function main() {
         .status(400)
         .json({ error: "Invalid payload", details: parsed.error.flatten() });
     }
-    const { phone, name, text, disablePrefix } = parsed.data;
+    const { phone, name, text, enablePrefix } = parsed.data;
     try {
-      await handleSend({ phone, name }, text, disablePrefix);
+      await handleSend({ phone, name }, text, enablePrefix);
       res.json({ ok: true, id: uuid() });
     } catch (err: any) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -314,7 +314,7 @@ async function main() {
         phone: z.string().optional(),
         name: z.string().optional(),
         text: z.string(),
-        disablePrefix: z.boolean().optional(),
+        enablePrefix: z.boolean().optional(),
         // firstRunAt is an ISO string; we don't validate the format strictly here
         firstRunAt: z.string().optional(),
         intervalMinutes: z.number().nullable().optional(),
@@ -366,7 +366,7 @@ async function main() {
       phone: z.string().optional(),
       name: z.string().optional(),
       text: z.string().optional(),
-      disablePrefix: z.boolean().optional(),
+      enablePrefix: z.boolean().optional(),
       firstRunAt: z.string().optional(),
       intervalMinutes: z.number().nullable().optional(),
       active: z.boolean().optional(),
