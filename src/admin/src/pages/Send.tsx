@@ -10,25 +10,25 @@ export default function Send() {
 
   return (
     <div className="space-y-6">
-      <DashboardMetrics />
-      <div className="space-y-4">
-        <div className="flex justify-end">
-          <select
-            value={mode}
-            onChange={(e) => setMode(e.target.value as "send" | "schedule")}
-            className="bg-wa-panel px-2 py-1 rounded text-white"
-          >
-            <option value="send">Send</option>
-            <option value="schedule">Schedule Send</option>
-          </select>
-        </div>
+      <div>
+        <h2 className="text-xl font-semibold mb-2">Stats</h2>
+        <DashboardMetrics />
+      </div>
+      <div>
+        <h2 className="text-xl font-semibold mb-2">Messaging</h2>
         {mode === "send" ? (
-          <SendForm />
+          <SendForm onSelectSchedule={() => setMode("schedule")} />
         ) : (
-          <ScheduleForm onCreated={() => setRefreshKey((k) => k + 1)} />
+          <ScheduleForm
+            onCreated={() => setRefreshKey((k) => k + 1)}
+            onSelectSend={() => setMode("send")}
+          />
         )}
       </div>
-      <ScheduleList refreshKey={refreshKey} />
+      <div>
+        <h2 className="text-xl font-semibold mb-2">Schedules</h2>
+        <ScheduleList refreshKey={refreshKey} />
+      </div>
     </div>
   );
 }

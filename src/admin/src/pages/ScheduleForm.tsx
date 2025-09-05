@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from "react";
 import { createSchedule, fetchTopContacts, fetchAllContacts } from "../lib/api";
 import type { Contact } from "../lib/types";
+import { ChevronDownIcon, PaperAirplaneIcon } from "../lib/icons";
 
 interface Props {
   onCreated: () => void;
+  onSelectSend: () => void;
 }
 
-export default function ScheduleForm({ onCreated }: Props) {
+export default function ScheduleForm({ onCreated, onSelectSend }: Props) {
   const [form, setForm] = useState({
     phone: "",
     text: "",
@@ -22,6 +24,7 @@ export default function ScheduleForm({ onCreated }: Props) {
   const [showAll, setShowAll] = useState(false);
   const [focused, setFocused] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
     fetchTopContacts().then((res) => setTopContacts(res.contacts));
@@ -210,12 +213,36 @@ export default function ScheduleForm({ onCreated }: Props) {
           />
           <label htmlFor="createActive">Active</label>
         </div>
-        <button
-          type="submit"
-          className="bg-wa-green hover:bg-wa-green/80 px-4 py-2 rounded text-wa-bg"
-        >
-          Create
-        </button>
+        <div className="relative inline-flex">
+          <button
+            type="submit"
+            className="bg-wa-green hover:bg-wa-green/80 px-3 py-2 rounded-l text-wa-bg flex items-center space-x-1"
+          >
+            <PaperAirplaneIcon className="w-5 h-5" />
+            <span>Schedule</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setMenuOpen((o) => !o)}
+            className="bg-wa-green hover:bg-wa-green/80 px-2 rounded-r text-wa-bg border-l border-wa-bg flex items-center"
+          >
+            <ChevronDownIcon className="w-4 h-4" />
+          </button>
+          {menuOpen && (
+            <div className="absolute right-0 mt-1 w-40 bg-wa-panel rounded shadow-lg z-20">
+              <button
+                type="button"
+                onClick={() => {
+                  setMenuOpen(false);
+                  onSelectSend();
+                }}
+                className="block w-full text-left px-3 py-2 hover:bg-wa-hover"
+              >
+                Send now
+              </button>
+            </div>
+          )}
+        </div>
         {status && <p className="text-yellow-400 text-sm">{status}</p>}
       </form>
     </div>

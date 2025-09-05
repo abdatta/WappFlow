@@ -1,8 +1,13 @@
 import React, { useState, useEffect } from "react";
 import { sendMessage, fetchTopContacts, fetchAllContacts } from "../lib/api";
 import type { Contact } from "../lib/types";
+import { PaperAirplaneIcon, ChevronDownIcon } from "../lib/icons";
 
-export default function SendForm() {
+interface Props {
+  onSelectSchedule: () => void;
+}
+
+export default function SendForm({ onSelectSchedule }: Props) {
   const [phone, setPhone] = useState("");
   const [selected, setSelected] = useState<Contact | null>(null);
   const [text, setText] = useState("");
@@ -12,6 +17,7 @@ export default function SendForm() {
   const [allContacts, setAllContacts] = useState<Contact[]>([]);
   const [showAll, setShowAll] = useState(false);
   const [focused, setFocused] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
     fetchTopContacts().then((res) => setTopContacts(res.contacts));
@@ -128,12 +134,35 @@ export default function SendForm() {
           />
           <label htmlFor="enablePrefixSend">Enable prefix</label>
         </div>
-        <button
-          type="submit"
-          className="bg-wa-green hover:bg-wa-green/80 px-4 py-2 rounded text-wa-bg"
-        >
-          Send
-        </button>
+        <div className="relative inline-flex">
+          <button
+            type="submit"
+            className="bg-wa-green hover:bg-wa-green/80 px-3 py-2 rounded-l text-wa-bg"
+          >
+            <PaperAirplaneIcon className="w-5 h-5" />
+          </button>
+          <button
+            type="button"
+            onClick={() => setMenuOpen((o) => !o)}
+            className="bg-wa-green hover:bg-wa-green/80 px-2 rounded-r text-wa-bg border-l border-wa-bg flex items-center"
+          >
+            <ChevronDownIcon className="w-4 h-4" />
+          </button>
+          {menuOpen && (
+            <div className="absolute right-0 mt-1 w-40 bg-wa-panel rounded shadow-lg z-20">
+              <button
+                type="button"
+                onClick={() => {
+                  setMenuOpen(false);
+                  onSelectSchedule();
+                }}
+                className="block w-full text-left px-3 py-2 hover:bg-wa-hover"
+              >
+                Schedule send
+              </button>
+            </div>
+          )}
+        </div>
         {status && <p className="text-yellow-400 text-sm">{status}</p>}
       </form>
     </div>
