@@ -13,7 +13,7 @@ export default function Dashboard() {
   const [health, setHealth] = useState<Health | null>(null);
   const [phone, setPhone] = useState("");
   const [text, setText] = useState("");
-  const [disablePrefix, setDisablePrefix] = useState(false);
+  const [enablePrefix, setEnablePrefix] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
   useEffect(() => {
@@ -34,7 +34,7 @@ export default function Dashboard() {
   async function handleSend(e: React.FormEvent) {
     e.preventDefault();
     try {
-      await sendMessage({ phone, text, disablePrefix });
+      await sendMessage({ phone, text, enablePrefix });
       setMessage("Message sent");
       setPhone("");
       setText("");
@@ -103,11 +103,11 @@ export default function Dashboard() {
           <div className="flex items-center space-x-2">
             <input
               type="checkbox"
-              id="disablePrefix"
-              checked={disablePrefix}
-              onChange={(e) => setDisablePrefix(e.target.checked)}
+              id="enablePrefix"
+              checked={enablePrefix}
+              onChange={(e) => setEnablePrefix(e.target.checked)}
             />
-            <label htmlFor="disablePrefix">Disable prefix</label>
+            <label htmlFor="enablePrefix">Enable prefix</label>
           </div>
           <button
             type="submit"

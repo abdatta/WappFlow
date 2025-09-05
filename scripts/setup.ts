@@ -11,7 +11,7 @@ const defaults: Record<string, Json> = {
     headless: false,
     timezone: "America/Los_Angeles",
     rate: { perMin: 10, perDay: 200, warmup: true, firstRunAt: null },
-    prefix: { text: "[wappbot]: ", defaultEnabled: true },
+    prefix: { text: "[wappbot]: ", defaultEnabled: false },
     vapid: { publicKey: "", privateKey: "" },
     topContactsN: 10,
     contactsRefreshInterval: 3600,

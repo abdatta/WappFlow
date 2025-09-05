@@ -7,7 +7,7 @@
  * configured timezone from settings.
  */
 
-import { getSchedules, saveSchedules, getSettings } from "./store.js";
+import { getSchedules, saveSchedules } from "./store.js";
 import { Schedule, ScheduleDto, SchedulesFile } from "./types.js";
 import { clampInterval, now, toIso, uuid } from "./utils.js";
 
@@ -15,7 +15,7 @@ export type ScheduleSendFn = (payload: {
   phone?: string;
   name?: string;
   text: string;
-  disablePrefix?: boolean;
+  enablePrefix?: boolean;
   scheduleId?: string;
 }) => Promise<void>;
 
@@ -93,6 +93,8 @@ export class Scheduler {
       // Initialize optional properties if they are missing.
       sched.failures = sched.failures ?? 0;
       sched.lastRunAt = sched.lastRunAt ?? null;
+      sched.missedRuns = sched.missedRuns ?? 0;
+      sched.enablePrefix = sched.enablePrefix ?? false;
       this.recalculateNextRun(sched, nowDt);
     }
     await this.persist();
@@ -164,6 +166,7 @@ export class Scheduler {
           } catch (e) {
             console.error("Failed to send schedule-delay alert", e);
           }
+          sched.missedRuns++;
           // For recurring jobs, advance to the next scheduled time to avoid
           // sending repeated alerts. One-off jobs will be retried on the next tick.
           if (sched.intervalMinutes) {
@@ -181,7 +184,7 @@ export class Scheduler {
             phone: sched.phone,
             name: sched.name,
             text: sched.text,
-            disablePrefix: sched.disablePrefix,
+            enablePrefix: sched.enablePrefix,
             scheduleId: sched.id,
           });
           sched.lastRunAt = toIso(nowDt);
@@ -232,13 +235,14 @@ export class Scheduler {
       phone: dto.phone,
       name: dto.name,
       text: dto.text,
-      disablePrefix: dto.disablePrefix ?? false,
+      enablePrefix: dto.enablePrefix ?? false,
       firstRunAt: toIso(firstRunAt),
       nextRunAt: toIso(firstRunAt),
       intervalMinutes,
       active: dto.active ?? true,
       lastRunAt: null,
       failures: 0,
+      missedRuns: 0,
       createdAt: toIso(now(this.tz)),
     };
     // Recalculate the next run time, especially for recurring jobs.
@@ -263,8 +267,8 @@ export class Scheduler {
     if (updates.phone !== undefined) sched.phone = updates.phone;
     if (updates.name !== undefined) sched.name = updates.name;
     if (updates.text) sched.text = updates.text;
-    if (typeof updates.disablePrefix === "boolean")
-      sched.disablePrefix = updates.disablePrefix;
+    if (typeof updates.enablePrefix === "boolean")
+      sched.enablePrefix = updates.enablePrefix;
     if (typeof updates.active === "boolean") sched.active = updates.active;
     if (updates.firstRunAt) {
       sched.firstRunAt = updates.firstRunAt;
@@ -326,7 +330,7 @@ export class Scheduler {
         phone: sched.phone,
         name: sched.name,
         text: sched.text,
-        disablePrefix: sched.disablePrefix,
+        enablePrefix: sched.enablePrefix,
         scheduleId: sched.id,
       });
       sched.lastRunAt = toIso(now(this.tz));

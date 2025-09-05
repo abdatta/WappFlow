@@ -6,7 +6,7 @@ export default function Send() {
   const [phone, setPhone] = useState("");
   const [selected, setSelected] = useState<Contact | null>(null);
   const [text, setText] = useState("");
-  const [disablePrefix, setDisablePrefix] = useState(false);
+  const [enablePrefix, setEnablePrefix] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
   const [topContacts, setTopContacts] = useState<Contact[]>([]);
   const [allContacts, setAllContacts] = useState<Contact[]>([]);
@@ -32,7 +32,7 @@ export default function Send() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     try {
-      const payload: any = { text, disablePrefix };
+      const payload: any = { text, enablePrefix };
       if (selected) {
         if (selected.phone) payload.phone = selected.phone;
         else payload.name = selected.name;
@@ -115,11 +115,11 @@ export default function Send() {
           <div className="flex items-center space-x-2">
             <input
               type="checkbox"
-              id="disablePrefixSend"
-              checked={disablePrefix}
-              onChange={(e) => setDisablePrefix(e.target.checked)}
+              id="enablePrefixSend"
+              checked={enablePrefix}
+              onChange={(e) => setEnablePrefix(e.target.checked)}
             />
-            <label htmlFor="disablePrefixSend">Disable prefix</label>
+            <label htmlFor="enablePrefixSend">Enable prefix</label>
           </div>
           <button
             type="submit"
