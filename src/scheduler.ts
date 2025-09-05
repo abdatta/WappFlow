@@ -7,7 +7,7 @@
  * configured timezone from settings.
  */
 
-import { getSchedules, saveSchedules, getSettings } from "./store.js";
+import { getSchedules, saveSchedules } from "./store.js";
 import { Schedule, ScheduleDto, SchedulesFile } from "./types.js";
 import { clampInterval, now, toIso, uuid } from "./utils.js";
 
@@ -22,19 +22,18 @@ export type ScheduleSendFn = (payload: {
 /**
  * An in-process scheduler for sending messages.
  * This class manages one-off and recurring message schedules, which are
- * persisted in a JSON file. Each job is scheduled individually using
- * timers based on its next run time. The actual sending of messages is
- * delegated to a `sendFn` provided during initialization, which allows
- * the scheduler to be decoupled from the message sending logic (e.g.,
- * the WhatsApp driver).
+ * persisted in a JSON file. It uses a simple `setInterval` loop to check
+ * for due jobs. The actual sending of messages is delegated to a `sendFn`
+ * provided during initialization, which allows the scheduler to be decoupled
+ * from the message sending logic (e.g., the WhatsApp driver).
  */
 export class Scheduler {
   // In-memory list of all schedules.
   private schedules: Schedule[] = [];
   // The timezone used for all date/time calculations.
   private tz: string = "UTC";
-  // Active timers for each scheduled job.
-  private jobs: Map<string, NodeJS.Timeout> = new Map();
+  // The timer for the main scheduler loop.
+  private timer: NodeJS.Timeout | null = null;
   // The function to call to execute a scheduled job.
   private sendFn!: ScheduleSendFn;
 
@@ -95,7 +94,7 @@ export class Scheduler {
       sched.failures = sched.failures ?? 0;
       sched.lastRunAt = sched.lastRunAt ?? null;
       sched.missedRuns = sched.missedRuns ?? 0;
-      (sched as any).enablePrefix = (sched as any).enablePrefix ?? false;
+      sched.enablePrefix = sched.enablePrefix ?? false;
       this.recalculateNextRun(sched, nowDt);
     }
     await this.persist();
@@ -113,92 +112,99 @@ export class Scheduler {
   }
 
   /**
-   * Starts the scheduler by setting up timers for all active schedules.
+   * Starts the main scheduler loop.
+   * @param sendFn The function to be called to execute a scheduled message.
    */
   start(sendFn: ScheduleSendFn): void {
     this.sendFn = sendFn;
-    for (const sched of this.schedules) {
-      this.scheduleJob(sched);
-    }
+    if (this.timer) return;
+    // The tick runs every 30 seconds to check for due jobs.
+    this.timer = setInterval(() => {
+      this.tick().catch((err) => console.error("Scheduler tick error", err));
+    }, 30000);
   }
 
-  /** Stop all scheduled timers. */
+  /**
+   * Stops the scheduler loop.
+   */
   stop(): void {
-    for (const t of this.jobs.values()) clearTimeout(t);
-    this.jobs.clear();
+    if (this.timer) {
+      clearInterval(this.timer);
+      this.timer = null;
+    }
   }
 
-  /** Schedule a single job based on its `nextRunAt`. */
-  private scheduleJob(sched: Schedule): void {
-    // clear existing timer if any
-    const existing = this.jobs.get(sched.id);
-    if (existing) clearTimeout(existing);
-    if (!sched.active) return;
+  /**
+   * The main scheduler tick.
+   * This method is called periodically and is the heart of the scheduler.
+   * It iterates through all active schedules, checks if they are due to run,
+   * and if so, executes them using the `sendFn`. It also handles rescheduling
+   * of recurring jobs and deactivation of one-off jobs.
+   */
+  private async tick(): Promise<void> {
     const nowDt = now(this.tz);
-    const next = new Date(sched.nextRunAt);
-    const delay = Math.max(0, next.getTime() - nowDt.getTime());
-    const timer = setTimeout(() => {
-      this.runJob(sched.id).catch((err) =>
-        console.error("Scheduler job error", err),
-      );
-    }, delay);
-    this.jobs.set(sched.id, timer);
-  }
-
-  /** Execute a scheduled job and reschedule if necessary. */
-  private async runJob(id: string): Promise<void> {
-    const sched = this.get(id);
-    if (!sched || !sched.active) return;
-    const nowDt = now(this.tz);
-    const next = new Date(sched.nextRunAt);
-    const scheduleTimeGraceMs = 60 * 1000;
-    const lateMs = nowDt.getTime() - next.getTime();
-    if (lateMs > scheduleTimeGraceMs) {
-      const alertMsg = `Scheduler: Skipped message for ${
-        sched.name || sched.phone
-      } due to delay of ${Math.round(lateMs / 1000)}s.`;
-      try {
-        await this.sendFn({ name: "Me India (Vi)", text: alertMsg });
-      } catch (e) {
-        console.error("Failed to send schedule-delay alert", e);
-      }
-      sched.missedRuns++;
-      if (sched.intervalMinutes) {
-        const nextDate = new Date(
-          next.getTime() + sched.intervalMinutes * 60000,
-        );
-        sched.nextRunAt = toIso(nextDate);
+    const scheduleTimeGraceMs = 60 * 1000; // 1 minute grace period.
+    for (const sched of this.schedules) {
+      if (!sched.active) continue;
+      const next = new Date(sched.nextRunAt);
+      if (next <= nowDt) {
+        // The job is due. Check if it's excessively late.
+        const lateMs = nowDt.getTime() - next.getTime();
+        if (lateMs > scheduleTimeGraceMs) {
+          // If a job is too late, skip it and send an alert. This prevents
+          // a burst of messages if the scheduler was stopped for a while.
+          const alertMsg = `Scheduler: Skipped message for ${
+            sched.name || sched.phone
+          } due to delay of ${Math.round(
+            lateMs / 1000,
+          )}s. Will retry next tick.`;
+          try {
+            await this.sendFn({
+              name: "Me India (Vi)",
+              text: alertMsg,
+            });
+          } catch (e) {
+            console.error("Failed to send schedule-delay alert", e);
+          }
+          sched.missedRuns++;
+          // For recurring jobs, advance to the next scheduled time to avoid
+          // sending repeated alerts. One-off jobs will be retried on the next tick.
+          if (sched.intervalMinutes) {
+            const nextDate = new Date(
+              next.getTime() + sched.intervalMinutes * 60000,
+            );
+            sched.nextRunAt = toIso(nextDate);
+            await this.persist();
+          }
+          continue;
+        }
+        // Execute the job.
+        try {
+          await this.sendFn({
+            phone: sched.phone,
+            name: sched.name,
+            text: sched.text,
+            enablePrefix: sched.enablePrefix,
+            scheduleId: sched.id,
+          });
+          sched.lastRunAt = toIso(nowDt);
+        } catch (err) {
+          sched.failures++;
+          console.error("Schedule execution failed", err);
+        }
+        // Reschedule or deactivate the job.
+        if (sched.intervalMinutes) {
+          // For recurring jobs, calculate the next run time.
+          const nextDate = new Date(
+            next.getTime() + sched.intervalMinutes * 60000,
+          );
+          sched.nextRunAt = toIso(nextDate);
+        } else {
+          // For one-off jobs, deactivate them after they run.
+          sched.active = false;
+        }
         await this.persist();
-        this.scheduleJob(sched);
-      } else {
-        sched.active = false;
-        await this.persist();
       }
-      return;
-    }
-
-    try {
-      await this.sendFn({
-        phone: sched.phone,
-        name: sched.name,
-        text: sched.text,
-        enablePrefix: sched.enablePrefix,
-        scheduleId: sched.id,
-      });
-      sched.lastRunAt = toIso(nowDt);
-    } catch (err) {
-      sched.failures++;
-      console.error("Schedule execution failed", err);
-    }
-
-    if (sched.intervalMinutes) {
-      const nextDate = new Date(next.getTime() + sched.intervalMinutes * 60000);
-      sched.nextRunAt = toIso(nextDate);
-      await this.persist();
-      this.scheduleJob(sched);
-    } else {
-      sched.active = false;
-      await this.persist();
     }
   }
 
@@ -243,7 +249,6 @@ export class Scheduler {
     this.recalculateNextRun(schedule, now(this.tz));
     this.schedules.push(schedule);
     await this.persist();
-    this.scheduleJob(schedule);
     return schedule;
   }
 
@@ -274,7 +279,6 @@ export class Scheduler {
     // After changing time-related properties, recalculate the next run.
     this.recalculateNextRun(sched, now(this.tz));
     await this.persist();
-    this.scheduleJob(sched);
     return sched;
   }
 
@@ -284,10 +288,6 @@ export class Scheduler {
   async delete(id: string): Promise<boolean> {
     const index = this.schedules.findIndex((s) => s.id === id);
     if (index < 0) return false;
-    const sched = this.schedules[index];
-    const timer = this.jobs.get(sched.id);
-    if (timer) clearTimeout(timer);
-    this.jobs.delete(sched.id);
     this.schedules.splice(index, 1);
     await this.persist();
     return true;
@@ -300,9 +300,6 @@ export class Scheduler {
     const sched = this.get(id);
     if (!sched) return false;
     sched.active = false;
-    const timer = this.jobs.get(id);
-    if (timer) clearTimeout(timer);
-    this.jobs.delete(id);
     await this.persist();
     return true;
   }
@@ -343,13 +340,11 @@ export class Scheduler {
         sched.nextRunAt = toIso(
           new Date(next.getTime() + sched.intervalMinutes * 60000),
         );
-        await this.persist();
-        this.scheduleJob(sched);
       } else {
         // A one-off job is deactivated after running.
         sched.active = false;
-        await this.persist();
       }
+      await this.persist();
       return true;
     } catch (err) {
       sched.failures++;
