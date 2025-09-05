@@ -1,88 +1,77 @@
 import React, { useState, useEffect } from "react";
-import { createSchedule, fetchTopContacts, fetchAllContacts } from "../lib/api";
+import { createSchedule } from "../lib/api";
 import type { Contact } from "../lib/types";
 import { ChevronDownIcon, PaperAirplaneIcon, ClockIcon } from "../lib/icons";
+import RecipientInput from "../components/RecipientInput";
 
 interface Props {
   onCreated: () => void;
   onSelectSend: () => void;
+  recipients: Contact[];
+  onRecipientsChange: (recipients: Contact[]) => void;
+  text: string;
+  onTextChange: (text: string) => void;
 }
 
-export default function ScheduleForm({ onCreated, onSelectSend }: Props) {
+export default function ScheduleForm({
+  onCreated,
+  onSelectSend,
+  recipients,
+  onRecipientsChange,
+  text,
+  onTextChange,
+}: Props) {
   const [form, setForm] = useState({
-    phone: "",
-    text: "",
     enablePrefix: false,
     firstRunAt: "",
     intervalValue: "1" as string | number,
     intervalUnit: "hours" as "hours" | "days" | "weeks",
     active: true,
   });
-  const [selected, setSelected] = useState<Contact | null>(null);
-  const [topContacts, setTopContacts] = useState<Contact[]>([]);
-  const [allContacts, setAllContacts] = useState<Contact[]>([]);
-  const [showAll, setShowAll] = useState(false);
-  const [focused, setFocused] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
 
-  useEffect(() => {
-    fetchTopContacts().then((res) => setTopContacts(res.contacts));
-    fetchAllContacts().then((res) => setAllContacts(res.contacts));
-  }, []);
-
-  const suggestions = selected
-    ? []
-    : form.phone
-      ? allContacts.filter(
-          (c) =>
-            c.phone?.includes(form.phone) ||
-            c.name.toLowerCase().includes(form.phone.toLowerCase()),
-        )
-      : showAll
-        ? allContacts
-        : topContacts;
-
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
+    if (recipients.length === 0) {
+      setStatus("Please select at least one recipient.");
+      return;
+    }
     try {
-      const payload: any = {
-        text: form.text,
-        enablePrefix: form.enablePrefix,
-        active: form.active,
-      };
-      if (selected) {
-        if (selected.phone) payload.phone = selected.phone;
-        else payload.name = selected.name;
-      } else if (form.phone) {
-        payload.phone = form.phone;
-      } else {
-        throw new Error("Missing contact");
+      for (const recipient of recipients) {
+        const payload: any = {
+          text,
+          enablePrefix: form.enablePrefix,
+          active: form.active,
+        };
+        if (recipient.phone) {
+          payload.phone = recipient.phone;
+        } else {
+          payload.name = recipient.name;
+        }
+        if (form.firstRunAt)
+          payload.firstRunAt = new Date(form.firstRunAt).toISOString();
+        if (form.intervalValue) {
+          const mult =
+            form.intervalUnit === "weeks"
+              ? 10080
+              : form.intervalUnit === "days"
+                ? 1440
+                : 60;
+          payload.intervalMinutes = Number(form.intervalValue) * mult;
+        }
+        await createSchedule(payload);
       }
-      if (form.firstRunAt)
-        payload.firstRunAt = new Date(form.firstRunAt).toISOString();
-      if (form.intervalValue) {
-        const mult =
-          form.intervalUnit === "weeks"
-            ? 10080
-            : form.intervalUnit === "days"
-              ? 1440
-              : 60;
-        payload.intervalMinutes = Number(form.intervalValue) * mult;
-      }
-      await createSchedule(payload);
-      setStatus("Schedule created");
+      setStatus(`Schedules created for ${recipients.length} recipient(s)`);
       setForm({
-        phone: "",
-        text: "",
         enablePrefix: false,
         firstRunAt: "",
         intervalValue: "1",
         intervalUnit: "hours",
         active: true,
       });
-      setSelected(null);
-      setShowAll(false);
+      onRecipientsChange([]);
+      onTextChange("");
       onCreated();
     } catch (err: any) {
       setStatus(err.response?.data?.error || err.message || "Error creating");
@@ -101,89 +90,23 @@ export default function ScheduleForm({ onCreated, onSelectSend }: Props) {
   );
 
   return (
-    <div className="bg-wa-panel p-4 rounded-lg space-y-4 max-w-xl">
-      <form onSubmit={handleCreate} className="space-y-3">
-        <div className="relative">
-          <label className="block mb-1">To</label>
-          <input
-            type="text"
-            value={form.phone}
-            onFocus={() => setFocused(true)}
-            onBlur={() => setTimeout(() => setFocused(false), 100)}
-            onChange={(e) => {
-              setForm({ ...form, phone: e.target.value });
-              setSelected(null);
-              if (e.target.value) setShowAll(false);
-            }}
-            className="w-full px-3 py-2 rounded bg-wa-hover text-white"
-          />
-          {focused && (
-            <div className="absolute z-10 mt-1 w-full bg-wa-hover max-h-48 overflow-y-auto rounded shadow-lg">
-              {suggestions.length > 0 ? (
-                <div className="space-y-2">
-                  {suggestions.map((c) => (
-                    <button
-                      key={c.phone || c.name}
-                      type="button"
-                      onMouseDown={() => {
-                        setSelected(c);
-                        setForm({
-                          ...form,
-                          phone: c.phone ? `${c.name} (${c.phone})` : c.name,
-                        });
-                      }}
-                      className="block w-full text-left bg-wa-hover hover:bg-wa-panel p-2 rounded"
-                    >
-                      <div className="font-medium">{c.name}</div>
-                      {c.phone && (
-                        <div className="text-xs text-gray-400">{c.phone}</div>
-                      )}
-                    </button>
-                  ))}
-                </div>
-              ) : (
-                !form.phone && (
-                  <p className="text-sm text-gray-400 p-2">
-                    No contacts yet. Add or import contacts to get started.
-                  </p>
-                )
-              )}
-              {!form.phone &&
-                !showAll &&
-                allContacts.length > topContacts.length && (
-                  <button
-                    type="button"
-                    onMouseDown={() => setShowAll(true)}
-                    className="text-wa-green text-sm px-2 py-1"
-                  >
-                    View all
-                  </button>
-                )}
-            </div>
-          )}
-        </div>
+    <div className="bg-wa-panel p-4 rounded-lg space-y-4 max-w-md">
+      <form onSubmit={handleCreate} className="space-y-4">
+        <RecipientInput
+          recipients={recipients}
+          onRecipientsChange={onRecipientsChange}
+        />
         <div>
           <label className="block mb-1">Message</label>
           <textarea
-            value={form.text}
-            onChange={(e) => setForm({ ...form, text: e.target.value })}
+            value={text}
+            onChange={(e) => onTextChange(e.target.value)}
             className="w-full px-3 py-2 rounded bg-wa-hover text-white"
           />
         </div>
-        <div className="flex items-center space-x-2">
-          <input
-            type="checkbox"
-            checked={form.enablePrefix}
-            id="createEnablePrefix"
-            onChange={(e) =>
-              setForm({ ...form, enablePrefix: e.target.checked })
-            }
-          />
-          <label htmlFor="createEnablePrefix">Enable prefix</label>
-        </div>
-        <div className="flex space-x-2">
-          <div className="flex-grow-[2]">
-            <label className="block mb-1">First run (local)</label>
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="block mb-1">First run at</label>
             <input
               type="datetime-local"
               value={form.firstRunAt}
@@ -191,54 +114,52 @@ export default function ScheduleForm({ onCreated, onSelectSend }: Props) {
               className="w-full px-3 py-2 rounded bg-wa-hover text-white"
             />
           </div>
-          <div className="flex-grow-[2]">
+          <div>
             <label className="block mb-1">Interval</label>
-            <div className="flex space-x-2">
-              <div className="flex-grow">
-                <select
-                  value={form.intervalValue}
-                  onChange={(e) =>
-                    setForm({ ...form, intervalValue: e.target.value })
-                  }
-                  className="w-full px-3 py-2 rounded bg-wa-hover text-white"
-                >
-                  {intervalNumbers.map((n) => (
-                    <option key={n} value={n}>
-                      {n}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="flex-grow">
-                <select
-                  value={form.intervalUnit}
-                  onChange={(e) =>
-                    setForm({
-                      ...form,
-                      intervalUnit: e.target.value as any,
-                      intervalValue: "1",
-                    })
-                  }
-                  className="px-2 py-2 rounded bg-wa-hover text-white"
-                >
-                  <option value="hours">Hours</option>
-                  <option value="days">Days</option>
-                  <option value="weeks">Weeks</option>
-                </select>
-              </div>
+            <div className="flex">
+              <select
+                value={form.intervalValue}
+                onChange={(e) =>
+                  setForm({ ...form, intervalValue: e.target.value })
+                }
+                className="w-1/2 px-3 py-2 rounded-l bg-wa-hover text-white"
+              >
+                {intervalNumbers.map((n) => (
+                  <option key={n} value={n}>
+                    {n}
+                  </option>
+                ))}
+              </select>
+              <select
+                value={form.intervalUnit}
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    intervalUnit: e.target.value as any,
+                    intervalValue: 1,
+                  })
+                }
+                className="w-1/2 px-3 py-2 rounded-r bg-wa-hover text-white"
+              >
+                <option value="hours">Hours</option>
+                <option value="days">Days</option>
+                <option value="weeks">Weeks</option>
+              </select>
             </div>
           </div>
         </div>
-        <div className="flex justify-between items-center">
-          <div className="flex items-center space-x-2">
-            <input
-              type="checkbox"
-              checked={form.active}
-              id="createActive"
-              onChange={(e) => setForm({ ...form, active: e.target.checked })}
-            />
-            <label htmlFor="createActive">Active</label>
-          </div>
+        <div className="flex items-center space-x-2">
+          <input
+            type="checkbox"
+            id="enablePrefixSchedule"
+            checked={form.enablePrefix}
+            onChange={(e) =>
+              setForm({ ...form, enablePrefix: e.target.checked })
+            }
+          />
+          <label htmlFor="enablePrefixSchedule">Enable prefix</label>
+        </div>
+        <div className="flex justify-end">
           <div className="relative inline-flex">
             <button
               type="submit"
@@ -266,7 +187,7 @@ export default function ScheduleForm({ onCreated, onSelectSend }: Props) {
                 >
                   <div className="flex items-center space-x-2">
                     <PaperAirplaneIcon className="w-5 h-5" />
-                    <span>Send</span>
+                    <span>Send now</span>
                   </div>
                 </button>
               </div>

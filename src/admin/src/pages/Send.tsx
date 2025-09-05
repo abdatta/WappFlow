@@ -3,10 +3,13 @@ import DashboardMetrics from "./DashboardMetrics";
 import SendForm from "./SendForm";
 import ScheduleForm from "./ScheduleForm";
 import ScheduleList from "./ScheduleList";
+import type { Contact } from "../lib/types";
 
 export default function Send() {
-  const [mode, setMode] = useState<"send" | "schedule">("send");
+  const [mode, setMode] = useState<"send" | "schedule">("schedule");
   const [refreshKey, setRefreshKey] = useState(0);
+  const [recipients, setRecipients] = useState<Contact[]>([]);
+  const [text, setText] = useState("");
 
   return (
     <div className="space-y-6">
@@ -17,11 +20,21 @@ export default function Send() {
       <div>
         <h2 className="text-xl font-semibold mb-2">Messaging</h2>
         {mode === "send" ? (
-          <SendForm onSelectSchedule={() => setMode("schedule")} />
+          <SendForm
+            onSelectSchedule={() => setMode("schedule")}
+            recipients={recipients}
+            onRecipientsChange={setRecipients}
+            text={text}
+            onTextChange={setText}
+          />
         ) : (
           <ScheduleForm
             onCreated={() => setRefreshKey((k) => k + 1)}
             onSelectSend={() => setMode("send")}
+            recipients={recipients}
+            onRecipientsChange={setRecipients}
+            text={text}
+            onTextChange={setText}
           />
         )}
       </div>
