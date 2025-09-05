@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { createSchedule, fetchTopContacts, fetchAllContacts } from "../lib/api";
 import type { Contact } from "../lib/types";
-import { ChevronDownIcon, PaperAirplaneIcon } from "../lib/icons";
+import { ChevronDownIcon, PaperAirplaneIcon, ClockIcon } from "../lib/icons";
 
 interface Props {
   onCreated: () => void;
@@ -14,8 +14,8 @@ export default function ScheduleForm({ onCreated, onSelectSend }: Props) {
     text: "",
     enablePrefix: false,
     firstRunAt: "",
-    intervalValue: "" as string | number,
-    intervalUnit: "minutes" as "minutes" | "hours" | "days",
+    intervalValue: "1" as string | number,
+    intervalUnit: "hours" as "hours" | "days" | "weeks",
     active: true,
   });
   const [selected, setSelected] = useState<Contact | null>(null);
@@ -63,11 +63,11 @@ export default function ScheduleForm({ onCreated, onSelectSend }: Props) {
         payload.firstRunAt = new Date(form.firstRunAt).toISOString();
       if (form.intervalValue) {
         const mult =
-          form.intervalUnit === "hours"
-            ? 60
+          form.intervalUnit === "weeks"
+            ? 10080
             : form.intervalUnit === "days"
               ? 1440
-              : 1;
+              : 60;
         payload.intervalMinutes = Number(form.intervalValue) * mult;
       }
       await createSchedule(payload);
@@ -77,8 +77,8 @@ export default function ScheduleForm({ onCreated, onSelectSend }: Props) {
         text: "",
         enablePrefix: false,
         firstRunAt: "",
-        intervalValue: "",
-        intervalUnit: "minutes",
+        intervalValue: "1",
+        intervalUnit: "hours",
         active: true,
       });
       setSelected(null);
@@ -88,6 +88,17 @@ export default function ScheduleForm({ onCreated, onSelectSend }: Props) {
       setStatus(err.response?.data?.error || err.message || "Error creating");
     }
   }
+
+  const intervalLimits = {
+    hours: 23,
+    days: 6,
+    weeks: 52,
+  };
+
+  const intervalNumbers = Array.from(
+    { length: intervalLimits[form.intervalUnit] },
+    (_, i) => i + 1,
+  );
 
   return (
     <div className="bg-wa-panel p-4 rounded-lg space-y-4 max-w-xl">
@@ -170,78 +181,97 @@ export default function ScheduleForm({ onCreated, onSelectSend }: Props) {
           />
           <label htmlFor="createEnablePrefix">Enable prefix</label>
         </div>
-        <div>
-          <label className="block mb-1">First run (local)</label>
-          <input
-            type="datetime-local"
-            value={form.firstRunAt}
-            onChange={(e) => setForm({ ...form, firstRunAt: e.target.value })}
-            className="w-full px-3 py-2 rounded bg-wa-hover text-white"
-          />
-        </div>
-        <div>
-          <label className="block mb-1">Interval</label>
-          <div className="flex space-x-2">
+        <div className="flex space-x-2">
+          <div className="flex-grow-[2]">
+            <label className="block mb-1">First run (local)</label>
             <input
-              type="number"
-              min="0"
-              value={form.intervalValue}
-              onChange={(e) =>
-                setForm({ ...form, intervalValue: e.target.value })
-              }
+              type="datetime-local"
+              value={form.firstRunAt}
+              onChange={(e) => setForm({ ...form, firstRunAt: e.target.value })}
               className="w-full px-3 py-2 rounded bg-wa-hover text-white"
             />
-            <select
-              value={form.intervalUnit}
-              onChange={(e) =>
-                setForm({ ...form, intervalUnit: e.target.value as any })
-              }
-              className="px-2 py-2 rounded bg-wa-hover text-white"
-            >
-              <option value="minutes">Minutes</option>
-              <option value="hours">Hours</option>
-              <option value="days">Days</option>
-            </select>
+          </div>
+          <div className="flex-grow-[2]">
+            <label className="block mb-1">Interval</label>
+            <div className="flex space-x-2">
+              <div className="flex-grow">
+                <select
+                  value={form.intervalValue}
+                  onChange={(e) =>
+                    setForm({ ...form, intervalValue: e.target.value })
+                  }
+                  className="w-full px-3 py-2 rounded bg-wa-hover text-white"
+                >
+                  {intervalNumbers.map((n) => (
+                    <option key={n} value={n}>
+                      {n}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex-grow">
+                <select
+                  value={form.intervalUnit}
+                  onChange={(e) =>
+                    setForm({
+                      ...form,
+                      intervalUnit: e.target.value as any,
+                      intervalValue: "1",
+                    })
+                  }
+                  className="px-2 py-2 rounded bg-wa-hover text-white"
+                >
+                  <option value="hours">Hours</option>
+                  <option value="days">Days</option>
+                  <option value="weeks">Weeks</option>
+                </select>
+              </div>
+            </div>
           </div>
         </div>
-        <div className="flex items-center space-x-2">
-          <input
-            type="checkbox"
-            checked={form.active}
-            id="createActive"
-            onChange={(e) => setForm({ ...form, active: e.target.checked })}
-          />
-          <label htmlFor="createActive">Active</label>
-        </div>
-        <div className="relative inline-flex">
-          <button
-            type="submit"
-            className="bg-wa-green hover:bg-wa-green/80 px-3 py-2 rounded-l text-wa-bg flex items-center space-x-1"
-          >
-            <PaperAirplaneIcon className="w-5 h-5" />
-            <span>Schedule</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setMenuOpen((o) => !o)}
-            className="bg-wa-green hover:bg-wa-green/80 px-2 rounded-r text-wa-bg border-l border-wa-bg flex items-center"
-          >
-            <ChevronDownIcon className="w-4 h-4" />
-          </button>
-          {menuOpen && (
-            <div className="absolute right-0 mt-1 w-40 bg-wa-panel rounded shadow-lg z-20">
-              <button
-                type="button"
-                onClick={() => {
-                  setMenuOpen(false);
-                  onSelectSend();
-                }}
-                className="block w-full text-left px-3 py-2 hover:bg-wa-hover"
-              >
-                Send now
-              </button>
-            </div>
-          )}
+        <div className="flex justify-between items-center">
+          <div className="flex items-center space-x-2">
+            <input
+              type="checkbox"
+              checked={form.active}
+              id="createActive"
+              onChange={(e) => setForm({ ...form, active: e.target.checked })}
+            />
+            <label htmlFor="createActive">Active</label>
+          </div>
+          <div className="relative inline-flex">
+            <button
+              type="submit"
+              className="bg-wa-green hover:bg-wa-green/80 px-3 py-2 rounded-l text-wa-bg flex items-center space-x-1"
+            >
+              <ClockIcon className="w-5 h-5" />
+              <span>Schedule</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setMenuOpen((o) => !o)}
+              className="bg-wa-green hover:bg-wa-green/80 px-2 rounded-r text-wa-bg border-l border-wa-bg flex items-center"
+            >
+              <ChevronDownIcon className="w-4 h-4" />
+            </button>
+            {menuOpen && (
+              <div className="absolute right-0 mt-1 w-40 bg-wa-panel rounded shadow-lg z-20">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    onSelectSend();
+                  }}
+                  className="block w-full text-left px-3 py-2 hover:bg-wa-hover"
+                >
+                  <div className="flex items-center space-x-2">
+                    <PaperAirplaneIcon className="w-5 h-5" />
+                    <span>Send</span>
+                  </div>
+                </button>
+              </div>
+            )}
+          </div>
         </div>
         {status && <p className="text-yellow-400 text-sm">{status}</p>}
       </form>
