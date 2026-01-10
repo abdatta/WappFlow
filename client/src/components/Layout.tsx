@@ -21,11 +21,13 @@ export function Layout({ children }: { children: any }) {
 
       <nav class="app-nav">
         {navItems.map((item) => (
-          <Link href={item.href} key={item.href}>
-            <a className={`nav-item ${location === item.href ? "active" : ""}`}>
-              <item.icon size={24} />
-              <span>{item.label}</span>
-            </a>
+          <Link
+            href={item.href}
+            key={item.href}
+            className={`nav-item ${location === item.href ? "active" : ""}`}
+          >
+            <item.icon size={24} />
+            <span>{item.label}</span>
           </Link>
         ))}
       </nav>

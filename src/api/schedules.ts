@@ -2,6 +2,8 @@ import { Router } from "express";
 import db from "../db/db.js";
 import { CreateScheduleDto, Schedule } from "../../shared/types.js";
 
+import { createScheduleSchema } from "../validations/scheduleSchemas.js";
+
 const router = Router();
 
 // GET all schedules
@@ -13,12 +15,13 @@ router.get("/", (req, res) => {
 
 // POST create schedule
 router.post("/", (req, res) => {
-  const body = req.body as CreateScheduleDto;
+  const validation = createScheduleSchema.safeParse(req.body);
 
-  // Basic validation
-  if (!body.phoneNumber || !body.message || !body.type) {
-    return res.status(400).json({ error: "Missing required fields" });
+  if (!validation.success) {
+    return res.status(400).json({ error: validation.error.issues[0].message });
   }
+
+  const body = validation.data;
 
   try {
     // If it's a recurring schedule with interval, map scheduleTime to nextRun
@@ -32,7 +35,19 @@ router.post("/", (req, res) => {
       VALUES (@type, @phoneNumber, @message, @scheduleTime, @cronExpression, @intervalValue, @intervalUnit, @toleranceMinutes, @nextRun, 'active')
     `);
 
-    const info = stmt.run({ ...body, nextRun });
+    const params = {
+      type: body.type,
+      phoneNumber: body.phoneNumber,
+      message: body.message,
+      scheduleTime: body.scheduleTime || null,
+      cronExpression: body.cronExpression || null,
+      intervalValue: body.intervalValue || null,
+      intervalUnit: body.intervalUnit || null,
+      toleranceMinutes: body.toleranceMinutes || null,
+      nextRun: nextRun || null,
+    };
+
+    const info = stmt.run(params);
     const newSchedule = db
       .prepare("SELECT * FROM schedules WHERE id = ?")
       .get(info.lastInsertRowid);

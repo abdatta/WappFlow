@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "lint": "eslint . --ext .ts,.tsx"
   },
   "dependencies": {
     "lucide-preact": "^0.469.0",
@@ -16,6 +17,11 @@
   "devDependencies": {
     "@preact/preset-vite": "^2.10.2",
     "@types/node": "^24.10.1",
+    "@typescript-eslint/eslint-plugin": "^8.52.0",
+    "@typescript-eslint/parser": "^8.52.0",
+    "eslint": "^8.57.1",
+    "eslint-config-preact": "^2.0.0",
+    "eslint-plugin-react": "^7.37.5",
     "typescript": "~5.9.3",
     "vite": "^7.2.4",
     "vite-plugin-pwa": "^0.21.1"
