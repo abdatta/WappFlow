@@ -1,54 +1,7 @@
-# Node
-node_modules/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-*.tsbuildinfo
-
-# Build output
-dist/
-dist-admin/
-src/admin/dist/
-
-# Logs
-*.log
-logs/
-*.jsonl
-
-# Env
+node_modules
+dist
 .env
-.env.local
-.env.*.local
-
-# Runtime state
-data/contacts.json
-data/limits.json
-data/session.json
-data/schedules.json
-data/settings.json
-data/subs.json
-data/sends.log.jsonl
-runtime/
-profiles/whatsapp/
-
-# Editor/OS
+data/
+*.log
 .DS_Store
-Thumbs.db
-.vscode/
-.idea/
-
-# Playwright
-playwright-report/
-test-results/
-.traces/
-
-# Admin UI specific
-src/admin/node_modules/
-src/admin/.vite/
-src/admin/.env.local
-
-# Optional package managers
-package-lock.json
-pnpm-lock.yaml
-yarn.lock
+coverage

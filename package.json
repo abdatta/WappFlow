@@ -1,40 +1,53 @@
 {
-  "name": "whatsapp-bot",
+  "name": "wapp-flow",
   "version": "1.0.0",
-  "private": true,
-  "type": "module",
+  "description": "WhatsApp Scheduler PWA",
+  "main": "dist/server.js",
+  "workspaces": [
+    "client"
+  ],
   "scripts": {
-    "setup": "tsx scripts/setup.ts",
-    "setup:force": "tsx scripts/setup.ts --force",
-    "setup:reset": "tsx scripts/setup.ts --force --reset-vapid",
-    "dev": "nodemon --watch src --ext ts,js --exec tsx src/server.ts",
-    "build": "tsup src/server.ts --format esm,cjs --out-dir dist --dts",
+    "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
+    "dev:server": "tsx watch src/server.ts",
+    "dev:client": "npm run dev --workspace=client",
+    "build": "npm run build:client && npm run build:server",
+    "build:client": "npm run build --workspace=client",
+    "build:server": "tsc -p tsconfig.json",
     "start": "node dist/server.js",
-    "admin:dev": "cd src/admin && npm install && npm run dev",
-    "admin:build": "cd src/admin && npm install && npm run build",
-    "vapid": "tsx src/cli/vapid.ts",
-    "playwright:install": "npx playwright install chromium",
-    "prettify:check": "prettier --check .",
-    "prettify": "prettier --write ."
+    "lint": "eslint . --ext .ts,.tsx",
+    "format": "prettier --write .",
+    "prepare": "husky",
+    "lint-staged": "lint-staged"
+  },
+  "lint-staged": {
+    "*.{ts,tsx,js,jsx,json,css,md}": [
+      "prettier --write"
+    ]
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.12",
+    "@types/express": "^5.0.0",
+    "@types/node": "^22.10.2",
+    "@types/node-cron": "^3.0.11",
+    "@types/web-push": "^3.6.4",
+    "concurrently": "^9.1.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^15.2.11",
+    "prettier": "^3.4.2",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
   },
   "dependencies": {
-    "cors": "^2.8.5",
-    "dotenv": "^10.0.0",
-    "express": "^4.18.2",
-    "libphonenumber-js": "^1.9.48",
-    "playwright": "^1.42.0",
-    "web-push": "^3.6.0",
-    "zod": "^3.22.2"
-  },
-  "devDependencies": {
-    "@types/cors": "^2.8.19",
-    "@types/express": "^5.0.3",
-    "@types/node": "^24.3.0",
-    "@types/web-push": "^3.6.4",
-    "nodemon": "^3.0.1",
-    "prettier": "^3.6.2",
-    "tsup": "^7.1.0",
-    "tsx": "^3.12.7",
-    "typescript": "^5.3.3"
+    "better-sqlite3": "^11.6.0",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "node-cron": "^3.0.3",
+    "playwright": "^1.49.1",
+    "sqlite-gui-node": "^1.2.0",
+    "web-push": "^3.6.7",
+    "wouter": "^3.3.5"
   }
 }
