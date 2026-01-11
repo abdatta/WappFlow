@@ -29,20 +29,11 @@ export const api = {
 
   // WhatsApp
   getWhatsAppStatus: async (): Promise<{
-    status: string;
     authenticated: boolean;
-    qrCode: string | null;
   }> => {
     const res = await fetch(`${API_BASE}/whatsapp/status`);
     if (!res.ok) throw new Error("Failed to get status");
     return res.json();
-  },
-
-  reconnectWhatsApp: async (): Promise<void> => {
-    const res = await fetch(`${API_BASE}/whatsapp/reconnect`, {
-      method: "POST",
-    });
-    if (!res.ok) throw new Error("Failed to reconnect");
   },
 
   // Notifications

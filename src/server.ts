@@ -1,7 +1,10 @@
 import express from "express";
 import path from "path";
+import { WebSocketServer } from "ws";
+import { randomUUID } from "crypto";
 import "./db/db.js"; // Initialize DB
 import { schedulerService } from "./services/scheduler.js";
+import { whatsappService } from "./services/whatsapp.js";
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -36,7 +39,55 @@ app.get("*", (req, res) => {
 });
 
 // Start Server
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
   schedulerService.init();
+});
+
+// WebSocket Server for WhatsApp Connection
+const wss = new WebSocketServer({ noServer: true });
+
+server.on("upgrade", (request, socket, head) => {
+  const { pathname } = new URL(request.url!, `http://${request.headers.host}`);
+
+  if (pathname === "/api/whatsapp/connect") {
+    wss.handleUpgrade(request, socket, head, (ws) => {
+      wss.emit("connection", ws, request);
+    });
+  } else {
+    socket.destroy();
+  }
+});
+
+wss.on("connection", (ws) => {
+  const connectionId = randomUUID();
+  console.log(`WebSocket connection established: ${connectionId}`);
+
+  whatsappService.startConnectionMonitoring(
+    connectionId,
+    (qrCode) => {
+      // Send QR code to client
+      ws.send(JSON.stringify({ type: "qr", qrCode }));
+    },
+    () => {
+      // Authentication successful
+      ws.send(JSON.stringify({ type: "authenticated" }));
+      ws.close();
+    },
+    (error) => {
+      // Error occurred
+      ws.send(JSON.stringify({ type: "error", message: error }));
+      ws.close();
+    },
+  );
+
+  ws.on("close", () => {
+    console.log(`WebSocket connection closed: ${connectionId}`);
+    whatsappService.stopConnectionMonitoring(connectionId);
+  });
+
+  ws.on("error", (error) => {
+    console.error(`WebSocket error for ${connectionId}:`, error);
+    whatsappService.stopConnectionMonitoring(connectionId);
+  });
 });

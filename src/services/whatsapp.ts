@@ -3,143 +3,312 @@ import path from "path";
 import fs from "fs";
 
 const USER_DATA_DIR = path.resolve("data/whatsapp_session");
+const STATUS_FILE = path.resolve("data/whatsapp_session_status.json");
+
+interface SessionStatus {
+  authenticated: boolean;
+  lastChecked: string;
+}
+
+type QRCallback = (qrCode: string | null) => void;
+type AuthCallback = () => void;
+type ErrorCallback = (error: string) => void;
 
 export class WhatsAppService {
   private browserContext: BrowserContext | null = null;
   private page: Page | null = null;
-  private qrCode: string | null = null; // Base64 image
-  private authenticated: boolean = false;
-  private status: "initializing" | "ready" | "disconnected" = "initializing";
+  private activeConnections = new Set<string>();
+  private qrMonitorInterval: NodeJS.Timeout | null = null;
 
   constructor() {
-    this.initialize();
+    this.ensureDirectories();
+    // Check authentication status on boot, then close
+    this.checkAuthOnce();
   }
 
-  async initialize() {
+  private ensureDirectories() {
+    if (!fs.existsSync(USER_DATA_DIR)) {
+      fs.mkdirSync(USER_DATA_DIR, { recursive: true });
+    }
+  }
+
+  private saveStatus(authenticated: boolean) {
+    const status: SessionStatus = {
+      authenticated,
+      lastChecked: new Date().toISOString(),
+    };
+    fs.writeFileSync(STATUS_FILE, JSON.stringify(status, null, 2));
+  }
+
+  private loadStatus(): SessionStatus | null {
     try {
-      console.log("Initializing WhatsApp Service...");
-      if (!fs.existsSync(USER_DATA_DIR)) {
-        fs.mkdirSync(USER_DATA_DIR, { recursive: true });
+      if (fs.existsSync(STATUS_FILE)) {
+        return JSON.parse(fs.readFileSync(STATUS_FILE, "utf-8"));
+      }
+    } catch (err) {
+      console.error("Failed to load status:", err);
+    }
+    return null;
+  }
+
+  async checkAuthOnce(): Promise<boolean> {
+    console.log("Checking WhatsApp authentication status...");
+    try {
+      await this.openBrowser();
+      const isAuthenticated = await this.isLoggedIn();
+      this.saveStatus(isAuthenticated);
+      console.log(
+        `WhatsApp status: ${isAuthenticated ? "Authenticated" : "Disconnected"}`,
+      );
+      await this.closeBrowser();
+      return isAuthenticated;
+    } catch (err) {
+      console.error("Failed to check auth status:", err);
+      this.saveStatus(false);
+      await this.closeBrowser();
+      return false;
+    }
+  }
+
+  getStatus(): { authenticated: boolean } {
+    const status = this.loadStatus();
+    return { authenticated: status?.authenticated ?? false };
+  }
+
+  private async openBrowser() {
+    if (this.browserContext) return; // Already open
+
+    console.log("Opening browser...");
+    this.browserContext = await chromium.launchPersistentContext(
+      USER_DATA_DIR,
+      {
+        headless: true,
+        viewport: { width: 1280, height: 960 },
+        userAgent:
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+        args: [
+          "--disable-blink-features=AutomationControlled", // Critical for stealth
+          "--disable-extensions",
+          "--disable-dev-shm-usage",
+          "--no-sandbox",
+          "--disable-setuid-sandbox",
+        ],
+      },
+    );
+
+    this.page =
+      this.browserContext.pages()[0] || (await this.browserContext.newPage());
+
+    // Hide webdriver property and other automation indicators
+    await this.page.addInitScript(() => {
+      // Override navigator.webdriver
+      Object.defineProperty(navigator, "webdriver", {
+        get: () => undefined,
+      });
+
+      // Override plugins to make it look like a real browser
+      Object.defineProperty(navigator, "plugins", {
+        get: () => [1, 2, 3, 4, 5],
+      });
+
+      // Override languages
+      Object.defineProperty(navigator, "languages", {
+        get: () => ["en-US", "en"],
+      });
+
+      // Chrome runtime
+      (window as any).chrome = {
+        runtime: {},
+      };
+    });
+
+    await this.page.goto("https://web.whatsapp.com", {
+      waitUntil: "networkidle",
+    });
+  }
+
+  private async closeBrowser() {
+    if (this.qrMonitorInterval) {
+      clearInterval(this.qrMonitorInterval);
+      this.qrMonitorInterval = null;
+    }
+
+    if (this.browserContext) {
+      console.log("Closing browser...");
+      await this.browserContext.close();
+      this.browserContext = null;
+      this.page = null;
+    }
+  }
+
+  private async isLoggedIn(): Promise<boolean> {
+    if (!this.page) return false;
+
+    try {
+      // Wait a bit for page to load
+      await this.page.waitForTimeout(3000);
+
+      // Check if logged in by looking for search box
+      const searchBox = await this.page.$('div[role="textbox"]');
+      return searchBox !== null;
+    } catch (err) {
+      return false;
+    }
+  }
+
+  private async getQRCode(): Promise<string | null> {
+    if (!this.page) {
+      return null;
+    }
+
+    try {
+      console.log("Searching for QR code...");
+      const qrContainer = await this.page.$("div:has(> canvas)");
+      if (qrContainer) {
+        const buffer = await qrContainer.screenshot();
+        const base64 = `data:image/png;base64,${buffer.toString("base64")}`;
+        return base64;
+      } else {
+        console.log("QR code element not found on page");
+        // Take debug screenshot to see what's actually on the page
+        const debugPath = path.resolve("data/whatsapp_debug.png");
+        await this.page.screenshot({ path: debugPath, fullPage: true });
+        console.log(`Debug screenshot saved to: ${debugPath}`);
+      }
+    } catch (err) {
+      console.error("Failed to capture QR code:", err);
+    }
+    return null;
+  }
+
+  async startConnectionMonitoring(
+    connectionId: string,
+    onQR: QRCallback,
+    onAuth: AuthCallback,
+    onError: ErrorCallback,
+  ) {
+    console.log(`Starting connection monitoring for ${connectionId}`);
+    this.activeConnections.add(connectionId);
+
+    try {
+      await this.openBrowser();
+
+      // Initial check
+      const isAuth = await this.isLoggedIn();
+      if (isAuth) {
+        console.log("Already authenticated!");
+        this.saveStatus(true);
+        onAuth();
+        await this.stopConnectionMonitoring(connectionId);
+        return;
       }
 
-      this.browserContext = await chromium.launchPersistentContext(
-        USER_DATA_DIR,
-        {
-          headless: false, // Must be false to work reliably with WA Web initially
-          viewport: { width: 1280, height: 960 },
-          args: [
-            "--disable-extensions",
-            "--no-sandbox",
-            "--disable-setuid-sandbox",
-            "--disable-gl-drawing-for-tests",
-            "--disable-dev-shm-usage",
-          ],
-        },
-      );
+      // Try to get QR code immediately
+      const initialQR = await this.getQRCode();
+      if (initialQR) {
+        console.log("Initial QR code captured");
+        onQR(initialQR);
+      }
 
-      this.page =
-        this.browserContext.pages()[0] || (await this.browserContext.newPage());
-
-      await this.page.goto("https://web.whatsapp.com");
-
-      this.monitorStatus();
-    } catch (err) {
-      console.error("Failed to initialize WhatsApp Service:", err);
-      this.status = "disconnected";
-    }
-  }
-
-  private async monitorStatus() {
-    if (!this.page) return;
-
-    // Check for QR Code or Chat List
-    try {
-      // Periodic check
-      setInterval(async () => {
-        if (!this.page || this.page.isClosed()) return;
-
-        // Check if logged in (look for chat list specific element, e.g., #pane-side)
-        // Note: Class names change, finding by reliable selectors is key.
-        // Using aria-label or specific localized text is risky.
-        // 2024: often identifiable by id="pane-side" or data-testid="chat-list"
-        const isLoggedIn = await this.page.$('div[role="textbox"]'); // Search box is a good indicator
-
-        if (isLoggedIn) {
-          if (!this.authenticated) {
-            console.log("WhatsApp Authenticated!");
-            this.authenticated = true;
-            this.qrCode = null;
-            this.status = "ready";
-          }
-        } else {
-          // Check for QR Code canvas
-          const qrCanvas = await this.page.$("canvas");
-          if (qrCanvas) {
-            this.authenticated = false;
-            this.status = "initializing";
-            // Capture QR
-            // We can take a screenshot of the canvas or specific container
-            // data-testid="qrcode"
-            const qrContainer = await this.page.$('[data-testid="qrcode"]');
-            if (qrContainer) {
-              const buffer = await qrContainer.screenshot();
-              this.qrCode = `data:image/png;base64,${buffer.toString("base64")}`;
-            }
-          }
-        }
+      // Start monitoring
+      this.qrMonitorInterval = setInterval(() => {
+        this.monitorQRAndAuth(connectionId, onQR, onAuth, onError).catch(
+          (err) => {
+            console.error("Error in monitoring interval:", err);
+          },
+        );
       }, 2000);
-    } catch (err) {
-      console.error("Error monitoring status:", err);
+    } catch (err: any) {
+      console.error("Connection monitoring error:", err);
+      onError(err.message);
+      await this.stopConnectionMonitoring(connectionId);
     }
   }
 
-  getStatus() {
-    return {
-      status: this.status,
-      authenticated: this.authenticated,
-      qrCode: this.qrCode,
-    };
+  private async monitorQRAndAuth(
+    connectionId: string,
+    onQR: QRCallback,
+    onAuth: AuthCallback,
+    onError: ErrorCallback,
+  ) {
+    try {
+      if (!this.page || this.page.isClosed()) {
+        console.log("Monitor: Page is closed or null");
+        return;
+      }
+
+      const isAuth = await this.isLoggedIn();
+      if (isAuth) {
+        console.log("WhatsApp authenticated!");
+        this.saveStatus(true);
+        onAuth();
+        await this.stopConnectionMonitoring(connectionId);
+        return;
+      }
+
+      // Get QR code
+      const qr = await this.getQRCode();
+      if (qr) {
+        console.log("QR code captured in monitor, calling callback...");
+        onQR(qr);
+      }
+    } catch (err: any) {
+      console.error("Monitor error:", err);
+    }
+  }
+
+  async stopConnectionMonitoring(connectionId: string) {
+    console.log(`Stopping connection monitoring for ${connectionId}`);
+    this.activeConnections.delete(connectionId);
+
+    // Close browser if no more active connections
+    if (this.activeConnections.size === 0) {
+      await this.closeBrowser();
+    }
   }
 
   async sendMessage(phoneNumber: string, message: string): Promise<boolean> {
-    if (!this.authenticated || !this.page) {
-      throw new Error("WhatsApp not connected");
-    }
+    console.log(`Attempting to send message to ${phoneNumber}`);
 
     try {
-      // Format number: remove + and spaces
-      const cleanNumber = phoneNumber.replace(/\D/g, "");
+      await this.openBrowser();
 
-      // Navigate to chat
-      // https://web.whatsapp.com/send?phone=...&text=...
+      // Check if still logged in
+      const isAuth = await this.isLoggedIn();
+      if (!isAuth) {
+        console.error("Not authenticated - QR code detected");
+        this.saveStatus(false);
+        await this.closeBrowser();
+        throw new Error("WhatsApp session expired - please reconnect");
+      }
+
+      // Send message
+      const cleanNumber = phoneNumber.replace(/\D/g, "");
       const url = `https://web.whatsapp.com/send?phone=${cleanNumber}&text=${encodeURIComponent(message)}`;
 
-      // Use existing page or new one? Existing page is safer for session
-      await this.page.goto(url);
+      await this.page!.goto(url);
 
       // Wait for send button
-      // data-testid="send" or aria-label="Send"
       const sendButtonSelector = 'span[data-icon="send"]';
-      await this.page.waitForSelector(sendButtonSelector, { timeout: 30000 });
-      await this.page.click(sendButtonSelector);
+      await this.page!.waitForSelector(sendButtonSelector, { timeout: 30000 });
+      await this.page!.click(sendButtonSelector);
 
-      // Wait a bit for message to actually send (tick icon)
-      // or just wait fixed time
-      await this.page.waitForTimeout(3000);
+      // Wait for message to send
+      await this.page!.waitForTimeout(3000);
 
+      console.log("Message sent successfully");
+      await this.closeBrowser();
       return true;
-    } catch (err) {
+    } catch (err: any) {
       console.error("Failed to send message:", err);
-      // Try to recover page
-      await this.page.goto("https://web.whatsapp.com");
+      await this.closeBrowser();
       throw err;
     }
   }
 
   async destroy() {
-    if (this.browserContext) {
-      await this.browserContext.close();
-    }
+    this.activeConnections.clear();
+    await this.closeBrowser();
   }
 }
 
