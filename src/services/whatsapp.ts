@@ -17,7 +17,14 @@ type ErrorCallback = (error: string) => void;
 export class WhatsAppService {
   private browserContext: BrowserContext | null = null;
   private page: Page | null = null;
-  private activeConnections = new Set<string>();
+  private activeConnections = new Map<
+    string,
+    {
+      onQR: QRCallback;
+      onAuth: AuthCallback;
+      onError: ErrorCallback;
+    }
+  >();
   private qrMonitorInterval: NodeJS.Timeout | null = null;
 
   constructor() {
@@ -188,7 +195,7 @@ export class WhatsAppService {
     onError: ErrorCallback,
   ) {
     console.log(`Starting connection monitoring for ${connectionId}`);
-    this.activeConnections.add(connectionId);
+    this.activeConnections.set(connectionId, { onQR, onAuth, onError });
 
     try {
       await this.openBrowser();
@@ -198,8 +205,11 @@ export class WhatsAppService {
       if (isAuth) {
         console.log("Already authenticated!");
         this.saveStatus(true);
-        onAuth();
-        await this.stopConnectionMonitoring(connectionId);
+        // Notify all connections
+        for (const [id, callbacks] of this.activeConnections) {
+          callbacks.onAuth();
+        }
+        await this.closeAllConnections();
         return;
       }
 
@@ -210,14 +220,15 @@ export class WhatsAppService {
         onQR(initialQR);
       }
 
-      // Start monitoring
-      this.qrMonitorInterval = setInterval(() => {
-        this.monitorQRAndAuth(connectionId, onQR, onAuth, onError).catch(
-          (err) => {
+      // Start monitoring interval only if not already running
+      if (!this.qrMonitorInterval) {
+        console.log("Starting QR monitoring interval");
+        this.qrMonitorInterval = setInterval(() => {
+          this.monitorAllConnections().catch((err) => {
             console.error("Error in monitoring interval:", err);
-          },
-        );
-      }, 2000);
+          });
+        }, 2000);
+      }
     } catch (err: any) {
       console.error("Connection monitoring error:", err);
       onError(err.message);
@@ -225,35 +236,45 @@ export class WhatsAppService {
     }
   }
 
-  private async monitorQRAndAuth(
-    connectionId: string,
-    onQR: QRCallback,
-    onAuth: AuthCallback,
-    onError: ErrorCallback,
-  ) {
+  private async monitorAllConnections() {
     try {
       if (!this.page || this.page.isClosed()) {
         console.log("Monitor: Page is closed or null");
         return;
       }
 
+      // Check if authenticated
       const isAuth = await this.isLoggedIn();
       if (isAuth) {
         console.log("WhatsApp authenticated!");
         this.saveStatus(true);
-        onAuth();
-        await this.stopConnectionMonitoring(connectionId);
+        // Notify all connections
+        for (const [id, callbacks] of this.activeConnections) {
+          callbacks.onAuth();
+        }
+        await this.closeAllConnections();
         return;
       }
 
-      // Get QR code
+      // Get QR code and broadcast to all connections
       const qr = await this.getQRCode();
       if (qr) {
-        console.log("QR code captured in monitor, calling callback...");
-        onQR(qr);
+        console.log(
+          `QR code captured, broadcasting to ${this.activeConnections.size} connections`,
+        );
+        for (const [id, callbacks] of this.activeConnections) {
+          callbacks.onQR(qr);
+        }
       }
     } catch (err: any) {
       console.error("Monitor error:", err);
+    }
+  }
+
+  private async closeAllConnections() {
+    const connectionIds = Array.from(this.activeConnections.keys());
+    for (const id of connectionIds) {
+      await this.stopConnectionMonitoring(id);
     }
   }
 
@@ -261,8 +282,13 @@ export class WhatsAppService {
     console.log(`Stopping connection monitoring for ${connectionId}`);
     this.activeConnections.delete(connectionId);
 
-    // Close browser if no more active connections
+    // Stop monitoring and close browser if no more active connections
     if (this.activeConnections.size === 0) {
+      if (this.qrMonitorInterval) {
+        console.log("Stopping QR monitoring interval");
+        clearInterval(this.qrMonitorInterval);
+        this.qrMonitorInterval = null;
+      }
       await this.closeBrowser();
     }
   }
