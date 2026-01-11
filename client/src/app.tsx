@@ -2,7 +2,7 @@ import { useEffect, useState } from "preact/hooks";
 import { Switch, Route } from "wouter-preact";
 import { Layout } from "./components/Layout";
 import { ConnectWhatsApp } from "./pages/ConnectWhatsApp";
-import { Dashboard } from "./pages/Dashboard";
+import { Schedules } from "./pages/Schedules";
 import { CreateSchedule } from "./pages/CreateSchedule";
 import { Settings } from "./pages/Settings";
 import { api } from "./services/api";
@@ -46,7 +46,7 @@ export function App() {
   return (
     <Layout>
       <Switch>
-        <Route path="/" component={Dashboard} />
+        <Route path="/" component={Schedules} />
         <Route path="/create" component={CreateSchedule} />
         <Route path="/settings" component={Settings} />
         <Route>

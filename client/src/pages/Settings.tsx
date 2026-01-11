@@ -1,11 +1,12 @@
-import { useState, useEffect } from "preact/hooks";
+import { useState } from "preact/hooks";
 import { api } from "../services/api";
+import { Bell, Info } from "lucide-preact";
+import "./Settings.css";
 
 export function Settings() {
   const [notifPermission, setNotifPermission] = useState(
     Notification.permission,
   );
-  const [subscribed, setSubscribed] = useState(false);
 
   const enableNotifications = async () => {
     try {
@@ -22,7 +23,6 @@ export function Settings() {
         });
 
         await api.subscribeToPush(subscription);
-        setSubscribed(true);
         alert("Notifications enabled!");
       }
     } catch (err) {
@@ -52,9 +52,15 @@ export function Settings() {
       <h2>Settings</h2>
 
       <div class="card">
-        <h3>Notifications</h3>
+        <h3>
+          <Bell size={20} />
+          Notifications
+        </h3>
         <p>
-          Permission: <strong>{notifPermission}</strong>
+          Permission:{" "}
+          <span class={`permission-status ${notifPermission}`}>
+            {notifPermission}
+          </span>
         </p>
 
         {notifPermission !== "granted" ? (
@@ -66,8 +72,11 @@ export function Settings() {
         )}
       </div>
 
-      <div class="card">
-        <h3>About</h3>
+      <div class="card about-section">
+        <h3>
+          <Info size={20} />
+          About
+        </h3>
         <p>WappFlow v1.0.0</p>
         <p>Local-first WhatsApp Scheduler</p>
       </div>

@@ -5,7 +5,7 @@ export function Layout({ children }: { children: any }) {
   const [location] = useLocation();
 
   const navItems = [
-    { href: "/", icon: Calendar, label: "Dashboard" },
+    { href: "/", icon: Calendar, label: "Schedules" },
     { href: "/create", icon: Plus, label: "Create" },
     { href: "/settings", icon: Settings, label: "Settings" },
   ];
