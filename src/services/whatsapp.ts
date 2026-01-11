@@ -1,6 +1,6 @@
-import { chromium, BrowserContext, Page } from "playwright";
-import path from "path";
 import fs from "fs";
+import path from "path";
+import { BrowserContext, chromium, Page } from "playwright";
 
 const USER_DATA_DIR = path.resolve("data/whatsapp_session");
 const STATUS_FILE = path.resolve("data/whatsapp_session_status.json");
@@ -89,7 +89,7 @@ export class WhatsAppService {
     this.browserContext = await chromium.launchPersistentContext(
       USER_DATA_DIR,
       {
-        headless: true,
+        headless: false,
         viewport: { width: 1280, height: 960 },
         userAgent:
           "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",

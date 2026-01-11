@@ -1,0 +1,48 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Debug Server",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev"],
+      "skipFiles": ["<node_internals>/**"],
+      "console": "integratedTerminal"
+    },
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Debug Backend (Watch)",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["tsx", "watch", "src/main.ts"],
+      "cwd": "${workspaceFolder}",
+      "restart": true,
+      "skipFiles": ["<node_internals>/**"],
+      "console": "integratedTerminal"
+    },
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Debug Curation Script",
+      "program": "${workspaceFolder}/src/curator/runCuration.ts",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["tsx"],
+      "skipFiles": ["<node_internals>/**"],
+      "console": "integratedTerminal",
+      "env": {
+        "FORCE_COLOR": "1"
+      }
+    },
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Debug Current File",
+      "program": "${file}",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["tsx"],
+      "skipFiles": ["<node_internals>/**"],
+      "console": "integratedTerminal"
+    }
+  ]
+}
