@@ -6,7 +6,7 @@ import "./CreateSchedule.css";
 export function CreateSchedule() {
   const [, setLocation] = useLocation();
   const [type, setType] = useState<"instant" | "once" | "recurring">("instant");
-  const [phone, setPhone] = useState("");
+  const [contactName, setContactName] = useState("");
   const [message, setMessage] = useState("");
   const [dateTime, setDateTime] = useState("");
 
@@ -26,7 +26,7 @@ export function CreateSchedule() {
     try {
       const payload: any = {
         type,
-        phoneNumber: phone,
+        contactName,
         message,
       };
 
@@ -70,12 +70,12 @@ export function CreateSchedule() {
 
       <form onSubmit={handleSubmit}>
         <div class="form-group">
-          <label>Phone Number (with country code)</label>
+          <label>Contact Name</label>
           <input
-            type="tel"
-            placeholder="+1234567890"
-            value={phone}
-            onInput={(e: any) => setPhone(e.target.value)}
+            type="text"
+            placeholder="John Doe"
+            value={contactName}
+            onInput={(e: any) => setContactName(e.target.value)}
             required
           />
         </div>
@@ -174,7 +174,13 @@ export function CreateSchedule() {
         )}
 
         <button type="submit" disabled={submitting}>
-          {submitting ? "Creating..." : "Create Schedule"}
+          {submitting
+            ? type === "instant"
+              ? "Sending..."
+              : "Creating..."
+            : type === "instant"
+              ? "Send Now"
+              : "Create Schedule"}
         </button>
       </form>
     </div>

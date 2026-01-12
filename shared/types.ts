@@ -1,12 +1,16 @@
 // Shared Types
 
+export interface Contact {
+  name: string;
+  phone?: string;
+}
+
 export interface Schedule {
   id: number;
   type: "instant" | "once" | "recurring";
-  phoneNumber: string;
+  contactName: string;
   message: string;
   scheduleTime?: string; // ISO string for 'once'
-  cronExpression?: string; // for 'recurring' (legacy/advanced)
   intervalValue?: number;
   intervalUnit?: "minute" | "hour" | "day" | "week" | "month";
   toleranceMinutes?: number;
@@ -26,10 +30,9 @@ export interface MessageLog {
 
 export interface CreateScheduleDto {
   type: "instant" | "once" | "recurring";
-  phoneNumber: string;
+  contactName: string;
   message: string;
   scheduleTime?: string;
-  cronExpression?: string;
   intervalValue?: number;
   intervalUnit?: "minute" | "hour" | "day" | "week" | "month";
   toleranceMinutes?: number;

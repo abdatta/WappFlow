@@ -2,6 +2,11 @@ import fs from "fs";
 import path from "path";
 import { BrowserContext, chromium, Page } from "playwright";
 
+// Utility function for human-like delays
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 const USER_DATA_DIR = path.resolve("data/whatsapp_session");
 const STATUS_FILE = path.resolve("data/whatsapp_session_status.json");
 
@@ -89,7 +94,7 @@ export class WhatsAppService {
     this.browserContext = await chromium.launchPersistentContext(
       USER_DATA_DIR,
       {
-        headless: false,
+        headless: true,
         viewport: { width: 1280, height: 960 },
         userAgent:
           "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
@@ -293,8 +298,28 @@ export class WhatsAppService {
     }
   }
 
-  async sendMessage(phoneNumber: string, message: string): Promise<boolean> {
-    console.log(`Attempting to send message to ${phoneNumber}`);
+  private async ensureReady(): Promise<void> {
+    if (!this.page) throw new Error("Page not initialized");
+    // Wait for WhatsApp Web to be fully loaded
+    await this.page.waitForSelector('div[role="textbox"]', { timeout: 30000 });
+    await delay(1000);
+  }
+
+  private async returnToChatList(): Promise<void> {
+    if (!this.page) return;
+    try {
+      // Navigate back to main WhatsApp page to avoid staying in a conversation
+      await this.page.goto("https://web.whatsapp.com", {
+        waitUntil: "networkidle",
+      });
+      await delay(500);
+    } catch (err) {
+      console.error("Failed to switch to main chat:", err);
+    }
+  }
+
+  async sendMessage(contactName: string, message: string): Promise<void> {
+    console.log(`Attempting to send message to contact: ${contactName}`);
 
     try {
       await this.openBrowser();
@@ -308,25 +333,39 @@ export class WhatsAppService {
         throw new Error("WhatsApp session expired - please reconnect");
       }
 
-      // Send message
-      const cleanNumber = phoneNumber.replace(/\D/g, "");
-      const url = `https://web.whatsapp.com/send?phone=${cleanNumber}&text=${encodeURIComponent(message)}`;
+      if (!this.page) throw new Error("Driver not initialized");
+      await this.ensureReady();
 
-      await this.page!.goto(url);
+      const searchSelector = "div[contenteditable='true'][data-tab='3']";
+      const composerSelector = "div[contenteditable='true'][data-tab]";
 
-      // Wait for send button
-      const sendButtonSelector = 'span[data-icon="send"]';
-      await this.page!.waitForSelector(sendButtonSelector, { timeout: 30000 });
-      await this.page!.click(sendButtonSelector);
+      // Search for the contact by name
+      await this.page.click(searchSelector);
+      await this.page.fill(searchSelector, contactName);
+      await this.page.waitForSelector(`span[title='${contactName}']`, {
+        timeout: 15000,
+      });
 
-      // Wait for message to send
-      await this.page!.waitForTimeout(3000);
+      // Click the contact in the search results to open the chat
+      await this.page.click(`span[title='${contactName}']`);
+      await this.page.waitForSelector(composerSelector, { timeout: 15000 });
 
-      console.log("Message sent successfully");
+      // Type and send the message
+      await delay(400 + Math.random() * 800);
+      // Clear any existing text first
+      await this.page.keyboard.press("Control+A");
+      await this.page.keyboard.press("Backspace");
+      await delay(200);
+
+      await this.page.keyboard.type(message);
+      await this.page.keyboard.press("Enter");
+      await delay(1000);
+      await this.returnToChatList();
+
+      console.log("Message sent successfully via contact search");
       await this.closeBrowser();
-      return true;
     } catch (err: any) {
-      console.error("Failed to send message:", err);
+      console.error("Failed to send message to contact:", err);
       await this.closeBrowser();
       throw err;
     }

@@ -1,8 +1,8 @@
-import { useEffect, useState } from "preact/hooks";
-import { api } from "../services/api";
 import type { Schedule } from "@shared/types";
-import { Trash2, RefreshCw, Zap, Clock } from "lucide-preact";
+import { Clock, RefreshCw, Trash2, Zap } from "lucide-preact";
+import { useEffect, useState } from "preact/hooks";
 import { Link } from "wouter-preact";
+import { api } from "../services/api";
 import "./Schedules.css";
 
 export function Schedules() {
@@ -98,18 +98,18 @@ export function Schedules() {
     }
 
     if (type === "recurring") {
-      if (schedule.cronExpression) {
-        return `Cron: ${schedule.cronExpression}`;
+      const unit = schedule.intervalUnit || "day";
+      const value = schedule.intervalValue || 1;
+      const unitStr = value > 1 ? `${unit}s` : unit;
+      const valuePrefix = value > 1 ? ` ${value}` : "";
+
+      let text = `Every${valuePrefix} ${unitStr}`;
+
+      if (schedule.nextRun) {
+        text += `. Next Run: ${formatFriendlyDate(new Date(schedule.nextRun))}`;
       }
-      if (schedule.scheduleTime) {
-        const time = new Date(schedule.scheduleTime).toLocaleTimeString([], {
-          hour: "numeric",
-          minute: "2-digit",
-          hour12: true,
-        });
-        return `Every day at ${time}`;
-      }
-      return "Recurring schedule";
+
+      return text;
     }
 
     return "Scheduled";
@@ -129,30 +129,105 @@ export function Schedules() {
           </Link>
         </p>
       ) : (
-        <div class="schedule-list">
-          {schedules.map((s) => (
-            <div key={s.id} class={`schedule-card status-${s.status}`}>
-              <div class="schedule-header">
-                <div class="schedule-timing">
-                  {getIcon(s.type)}
-                  <span>{getTimingText(s)}</span>
-                </div>
-                <button onClick={() => handleDelete(s.id)} class="btn-icon">
-                  <Trash2 size={18} />
-                </button>
-              </div>
-
-              <div class="schedule-body">
-                <p class="message-preview">{s.message}</p>
-              </div>
-
-              <div class="schedule-footer">
-                <span class="phone-badge">{s.phoneNumber}</span>
-              </div>
+        <>
+          <div class="schedule-section">
+            <h3>Upcoming & Recurring</h3>
+            <div class="schedule-list">
+              {schedules
+                .filter(
+                  (s) =>
+                    s.type === "recurring" ||
+                    (s.type === "once" &&
+                      (s.status === "pending" || s.status === "active")),
+                )
+                .map((s) => (
+                  <ScheduleCard
+                    key={s.id}
+                    schedule={s}
+                    onDelete={handleDelete}
+                    getIcon={getIcon}
+                    getTimingText={getTimingText}
+                  />
+                ))}
+              {schedules.filter(
+                (s) =>
+                  s.type === "recurring" ||
+                  (s.type === "once" &&
+                    (s.status === "pending" || s.status === "active")),
+              ).length === 0 && (
+                <p class="section-empty">No active schedules</p>
+              )}
             </div>
-          ))}
-        </div>
+          </div>
+
+          <div class="schedule-section history-section">
+            <h3>History</h3>
+            <div class="schedule-list">
+              {schedules
+                .filter(
+                  (s) =>
+                    s.type === "instant" ||
+                    (s.type === "once" &&
+                      (s.status === "completed" ||
+                        s.status === "failed" ||
+                        s.status === "cancelled")),
+                )
+                .map((s) => (
+                  <ScheduleCard
+                    key={s.id}
+                    schedule={s}
+                    onDelete={handleDelete}
+                    getIcon={getIcon}
+                    getTimingText={getTimingText}
+                  />
+                ))}
+              {schedules.filter(
+                (s) =>
+                  s.type === "instant" ||
+                  (s.type === "once" &&
+                    (s.status === "completed" ||
+                      s.status === "failed" ||
+                      s.status === "cancelled")),
+              ).length === 0 && <p class="section-empty">No history</p>}
+            </div>
+          </div>
+        </>
       )}
+    </div>
+  );
+}
+
+function ScheduleCard({
+  schedule,
+  onDelete,
+  getIcon,
+  getTimingText,
+}: {
+  schedule: Schedule;
+  onDelete: (id: number) => void;
+  getIcon: (type: string) => any;
+  getTimingText: (s: Schedule) => string;
+}) {
+  const s = schedule;
+  return (
+    <div class={`schedule-card status-${s.status}`}>
+      <div class="schedule-header">
+        <div class="schedule-timing">
+          {getIcon(s.type)}
+          <span>{getTimingText(s)}</span>
+        </div>
+        <button onClick={() => onDelete(s.id)} class="btn-icon">
+          <Trash2 size={18} />
+        </button>
+      </div>
+
+      <div class="schedule-body">
+        <p class="message-preview">{s.message}</p>
+      </div>
+
+      <div class="schedule-footer">
+        <span class="phone-badge">{s.contactName}</span>
+      </div>
     </div>
   );
 }

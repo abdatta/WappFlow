@@ -1,8 +1,10 @@
 import { Router } from "express";
+import { Schedule } from "../../shared/types.js";
 import db from "../db/db.js";
-import { CreateScheduleDto, Schedule } from "../../shared/types.js";
 
 import { createScheduleSchema } from "../validations/scheduleSchemas.js";
+
+import { whatsappService } from "../services/whatsapp.js";
 
 const router = Router();
 
@@ -14,7 +16,7 @@ router.get("/", (req, res) => {
 });
 
 // POST create schedule
-router.post("/", (req, res) => {
+router.post("/", async (req, res) => {
   const validation = createScheduleSchema.safeParse(req.body);
 
   if (!validation.success) {
@@ -24,6 +26,15 @@ router.post("/", (req, res) => {
   const body = validation.data;
 
   try {
+    // Direct send for 'instant' messages
+    if (body.type === "instant") {
+      console.log("Processing instant message request...");
+      await whatsappService.sendMessage(body.contactName, body.message);
+      // We don't save to DB as per requirement
+      // But we should probably return something that looks successful
+      return res.status(200).json({ success: true, message: "Message sent" });
+    }
+
     // If it's a recurring schedule with interval, map scheduleTime to nextRun
     let nextRun = undefined;
     if (body.type === "recurring" && body.intervalValue) {
@@ -31,16 +42,15 @@ router.post("/", (req, res) => {
     }
 
     const stmt = db.prepare(`
-      INSERT INTO schedules (type, phoneNumber, message, scheduleTime, cronExpression, intervalValue, intervalUnit, toleranceMinutes, nextRun, status)
-      VALUES (@type, @phoneNumber, @message, @scheduleTime, @cronExpression, @intervalValue, @intervalUnit, @toleranceMinutes, @nextRun, 'active')
+      INSERT INTO schedules (type, contactName, message, scheduleTime, intervalValue, intervalUnit, toleranceMinutes, nextRun, status)
+      VALUES (@type, @contactName, @message, @scheduleTime, @intervalValue, @intervalUnit, @toleranceMinutes, @nextRun, 'active')
     `);
 
     const params = {
       type: body.type,
-      phoneNumber: body.phoneNumber,
+      contactName: body.contactName,
       message: body.message,
       scheduleTime: body.scheduleTime || null,
-      cronExpression: body.cronExpression || null,
       intervalValue: body.intervalValue || null,
       intervalUnit: body.intervalUnit || null,
       toleranceMinutes: body.toleranceMinutes || null,
@@ -54,6 +64,7 @@ router.post("/", (req, res) => {
 
     res.status(201).json(newSchedule);
   } catch (err: any) {
+    console.error("Error processing schedule request:", err);
     res.status(500).json({ error: err.message });
   }
 });
