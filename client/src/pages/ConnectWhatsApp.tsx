@@ -1,4 +1,4 @@
-import { useState, useEffect } from "preact/hooks";
+import { useEffect, useState } from "preact/hooks";
 import "./ConnectWhatsApp.css";
 
 export function ConnectWhatsApp() {
@@ -6,6 +6,7 @@ export function ConnectWhatsApp() {
     "disconnected" | "connecting" | "connected"
   >("disconnected");
   const [qrCode, setQrCode] = useState<string | null>(null);
+  const [streamImage, setStreamImage] = useState<string | null>(null);
   const [ws, setWs] = useState<WebSocket | null>(null);
 
   const handleConnect = () => {
@@ -15,6 +16,7 @@ export function ConnectWhatsApp() {
 
     setState("connecting");
     setQrCode(null);
+    setStreamImage(null);
 
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
     const wsUrl = `${protocol}//${window.location.host}/api/whatsapp/connect`;
@@ -29,6 +31,9 @@ export function ConnectWhatsApp() {
 
       if (data.type === "qr") {
         setQrCode(data.qrCode);
+        setStreamImage(null);
+      } else if (data.type === "stream") {
+        setStreamImage(data.image);
       } else if (data.type === "authenticated") {
         setState("connected");
         // Reload page to update auth state in App
@@ -61,6 +66,7 @@ export function ConnectWhatsApp() {
     }
     setState("disconnected");
     setQrCode(null);
+    setStreamImage(null);
   };
 
   useEffect(() => {
@@ -100,24 +106,31 @@ export function ConnectWhatsApp() {
 
         {state === "connecting" && (
           <>
-            {qrCode ? (
-              <div class="qr-wrapper">
-                <div class="qr-container">
+            <div class="qr-wrapper">
+              <div class="qr-container">
+                {/* Prefer stream image if available, otherwise fall back to QR code or loader */}
+                {streamImage ? (
+                  <img
+                    src={streamImage}
+                    alt="WhatsApp Web Stream"
+                    style={{ width: "100%", height: "auto" }}
+                  />
+                ) : qrCode ? (
                   <img src={qrCode} alt="WhatsApp QR Code" />
-                </div>
-                <p class="qr-instructions">
-                  Open WhatsApp on your phone → Menu → Linked devices → Link a
-                  device
-                </p>
-                <button onClick={handleDisconnect} class="btn-secondary">
-                  Cancel
-                </button>
+                ) : (
+                  <div class="loading-placeholder">
+                    <p>Opening browser...</p>
+                  </div>
+                )}
               </div>
-            ) : (
               <p class="qr-instructions">
-                Opening browser and loading QR code...
+                Open WhatsApp on your phone → Menu → Linked devices → Link a
+                device
               </p>
-            )}
+              <button onClick={handleDisconnect} class="btn-secondary">
+                Cancel
+              </button>
+            </div>
           </>
         )}
 

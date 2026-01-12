@@ -17,6 +17,7 @@ interface SessionStatus {
 
 type QRCallback = (qrCode: string | null) => void;
 type AuthCallback = () => void;
+type StreamCallback = (image: string) => void;
 type ErrorCallback = (error: string) => void;
 
 export class WhatsAppService {
@@ -27,10 +28,13 @@ export class WhatsAppService {
     {
       onQR: QRCallback;
       onAuth: AuthCallback;
+      onStream: StreamCallback;
       onError: ErrorCallback;
     }
   >();
   private qrMonitorInterval: NodeJS.Timeout | null = null;
+  private streamInterval: NodeJS.Timeout | null = null;
+  private isQRVisible: boolean = false;
 
   constructor() {
     this.ensureDirectories();
@@ -143,6 +147,11 @@ export class WhatsAppService {
       this.qrMonitorInterval = null;
     }
 
+    if (this.streamInterval) {
+      clearInterval(this.streamInterval);
+      this.streamInterval = null;
+    }
+
     if (this.browserContext) {
       console.log("Closing browser...");
       await this.browserContext.close();
@@ -176,9 +185,11 @@ export class WhatsAppService {
       if (qrContainer) {
         const buffer = await qrContainer.screenshot();
         const base64 = `data:image/png;base64,${buffer.toString("base64")}`;
+        this.isQRVisible = true;
         return base64;
       } else {
         console.log("QR code element not found on page");
+        this.isQRVisible = false;
         // Take debug screenshot to see what's actually on the page
         const debugPath = path.resolve("data/whatsapp_debug.png");
         await this.page.screenshot({ path: debugPath, fullPage: true });
@@ -186,6 +197,7 @@ export class WhatsAppService {
       }
     } catch (err) {
       console.error("Failed to capture QR code:", err);
+      this.isQRVisible = false;
     }
     return null;
   }
@@ -195,12 +207,21 @@ export class WhatsAppService {
     onQR: QRCallback,
     onAuth: AuthCallback,
     onError: ErrorCallback,
+    onStream: StreamCallback,
   ) {
     console.log(`Starting connection monitoring for ${connectionId}`);
-    this.activeConnections.set(connectionId, { onQR, onAuth, onError });
+    this.activeConnections.set(connectionId, {
+      onQR,
+      onAuth,
+      onError,
+      onStream,
+    });
 
     try {
       await this.openBrowser();
+
+      // Start streaming immediately
+      this.startStreaming();
 
       // Initial check
       const isAuth = await this.isLoggedIn();
@@ -236,6 +257,35 @@ export class WhatsAppService {
       onError(err.message);
       await this.stopConnectionMonitoring(connectionId);
     }
+  }
+
+  private startStreaming() {
+    if (this.streamInterval) return;
+
+    console.log("Starting browser streaming...");
+    this.streamInterval = setInterval(async () => {
+      // Pause streaming if QR code is visible (optimization)
+      if (this.isQRVisible) return;
+
+      if (!this.page || this.page.isClosed()) return;
+
+      try {
+        // Capture screenshot of the full page (scaled down for performance if needed, but standard is fine)
+        const buffer = await this.page.screenshot({
+          type: "jpeg",
+          quality: 50, // Compress to reduce bandwidth
+          scale: "css",
+        });
+        const base64 = `data:image/jpeg;base64,${buffer.toString("base64")}`;
+
+        // Broadcast to all connections that requested streaming
+        for (const [id, callbacks] of this.activeConnections) {
+          callbacks.onStream(base64);
+        }
+      } catch (err) {
+        // Ignore errors during streaming (page might be closing etc)
+      }
+    }, 1000); // 1 second interval
   }
 
   private async monitorAllConnections() {
@@ -290,6 +340,10 @@ export class WhatsAppService {
         console.log("Stopping QR monitoring interval");
         clearInterval(this.qrMonitorInterval);
         this.qrMonitorInterval = null;
+      }
+      if (this.streamInterval) {
+        clearInterval(this.streamInterval);
+        this.streamInterval = null;
       }
       await this.closeBrowser();
     }

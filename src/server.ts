@@ -88,6 +88,10 @@ wss.on("connection", (ws) => {
       ws.send(JSON.stringify({ type: "error", message: error }));
       ws.close();
     },
+    (image) => {
+      // Send stream image to client
+      ws.send(JSON.stringify({ type: "stream", image }));
+    },
   );
 
   ws.on("close", () => {
