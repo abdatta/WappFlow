@@ -24,27 +24,27 @@ export function CreateSchedule() {
     e.preventDefault();
     setSubmitting(true);
     try {
-      const payload: any = {
-        type,
-        contactName,
-        message,
-      };
+      if (type === "instant") {
+        await api.sendInstantMessage({ contactName, message });
+      } else {
+        const payload: any = {
+          type,
+          contactName,
+          message,
+        };
 
-      if (type === "once") {
-        payload.scheduleTime = new Date(dateTime).toISOString();
-      } else if (type === "recurring") {
-        if (!startDateTime) throw new Error("Start time is required");
-        // We use nextRun as the start time (this will be mapped in backend/type)
-        // Actually, shared types say nextRun is on Schedule, not DTO.
-        // Wait, DTO doesn't have nextRun. We should probably map request->nextRun in backend or use `scheduleTime` field for initial start?
-        // Let's check DTO. It has `scheduleTime`. I can use that for initial nextRun.
-        payload.scheduleTime = new Date(startDateTime).toISOString();
-        payload.intervalValue = parseInt(intervalValue);
-        payload.intervalUnit = intervalUnit;
-        if (tolerance) payload.toleranceMinutes = parseInt(tolerance);
+        if (type === "once") {
+          payload.scheduleTime = new Date(dateTime).toISOString();
+        } else if (type === "recurring") {
+          if (!startDateTime) throw new Error("Start time is required");
+          payload.scheduleTime = new Date(startDateTime).toISOString();
+          payload.intervalValue = parseInt(intervalValue);
+          payload.intervalUnit = intervalUnit;
+          if (tolerance) payload.toleranceMinutes = parseInt(tolerance);
+        }
+
+        await api.createSchedule(payload);
       }
-
-      await api.createSchedule(payload);
       setLocation("/");
     } catch (err: any) {
       alert("Failed to create schedule: " + err.message);

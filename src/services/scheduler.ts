@@ -34,6 +34,12 @@ class SchedulerService {
   }
 
   async checkSchedules() {
+    const status = whatsappService.getStatus();
+    if (!status.authenticated) {
+      // console.log("Skipping schedule execution: WhatsApp not authenticated");
+      return;
+    }
+
     const now = new Date();
     const nowIso = now.toISOString();
 
@@ -65,8 +71,9 @@ class SchedulerService {
             console.warn(
               `Schedule ${s.id} skipped. Late by ${diffMinutes.toFixed(1)}m > tolerance ${s.toleranceMinutes}m`,
             );
-            this.logResult(
-              s.id,
+            const logId = this.createHistoryEntry(s, "sending");
+            this.updateHistoryEntry(
+              logId,
               "failed",
               `Skipped: Late by ${diffMinutes.toFixed(1)}m`,
             );
@@ -210,6 +217,8 @@ class SchedulerService {
     // Mark as running
     this.runningTasks.add(schedule.id);
 
+    const logId = this.createHistoryEntry(schedule, "sending");
+
     try {
       // Use contact-based sending logic
       await whatsappService.sendMessage(schedule.contactName, schedule.message);
@@ -231,7 +240,7 @@ class SchedulerService {
         }
       }
 
-      this.logResult(schedule.id, "sent");
+      this.updateHistoryEntry(logId, "sent");
 
       // TODO: Send notification to user
     } catch (err: any) {
@@ -253,21 +262,39 @@ class SchedulerService {
         this.updateNextRun(schedule);
       }
 
-      this.logResult(schedule.id, "failed", err.message);
+      this.updateHistoryEntry(logId, "failed", err.message);
     } finally {
       // Always clean up running state
       this.runningTasks.delete(schedule.id);
     }
   }
 
-  private logResult(
-    scheduleId: number,
+  private createHistoryEntry(
+    schedule: Schedule,
+    status: "sending" | "sent" | "failed",
+  ): number | bigint {
+    const info = db
+      .prepare(
+        "INSERT INTO message_logs (scheduleId, type, contactName, message, status) VALUES (?, ?, ?, ?, ?)",
+      )
+      .run(
+        schedule.id,
+        schedule.type,
+        schedule.contactName,
+        schedule.message,
+        status,
+      );
+    return info.lastInsertRowid;
+  }
+
+  private updateHistoryEntry(
+    logId: number | bigint,
     status: "sent" | "failed",
     error?: string,
   ) {
     db.prepare(
-      "INSERT INTO message_logs (scheduleId, status, error) VALUES (?, ?, ?)",
-    ).run(scheduleId, status, error);
+      "UPDATE message_logs SET status = ?, error = ? WHERE id = ?",
+    ).run(status, error || null, logId);
   }
 }
 

@@ -1,7 +1,7 @@
+import { randomUUID } from "crypto";
 import express from "express";
 import path from "path";
 import { WebSocketServer } from "ws";
-import { randomUUID } from "crypto";
 import "./db/db.js"; // Initialize DB
 import { schedulerService } from "./services/scheduler.js";
 import { whatsappService } from "./services/whatsapp.js";
@@ -25,6 +25,9 @@ app.use("/api/whatsapp", whatsappRouter);
 
 import notificationsRouter from "./api/notifications.js";
 app.use("/api/notifications", notificationsRouter);
+
+import historyRouter from "./api/history.js";
+app.use("/api/history", historyRouter);
 
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok", time: new Date().toISOString() });

@@ -3,11 +3,33 @@ import type { CreateScheduleDto, Schedule } from "@shared/types";
 const API_BASE = "/api";
 
 export const api = {
+  // History
+  getHistory: async (): Promise<any[]> => {
+    const res = await fetch(`${API_BASE}/history`);
+    if (!res.ok) throw new Error("Failed to fetch history");
+    return res.json();
+  },
+
   // Schedules
   getSchedules: async (): Promise<Schedule[]> => {
     const res = await fetch(`${API_BASE}/schedules`);
     if (!res.ok) throw new Error("Failed to fetch schedules");
     return res.json();
+  },
+
+  sendInstantMessage: async (data: {
+    contactName: string;
+    message: string;
+  }): Promise<void> => {
+    const res = await fetch(`${API_BASE}/whatsapp/send`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error || "Failed to send message");
+    }
   },
 
   createSchedule: async (data: CreateScheduleDto): Promise<Schedule> => {

@@ -4,15 +4,24 @@ export function runMigrations(db: Database.Database) {
   // DROP tables to enforce schema change (Data Loss is expected/requested)
   try {
     const tableInfo = db.prepare("PRAGMA table_info(schedules)").all() as any[];
-    // Check if we still have the old schema (e.g. cronExpression exists)
+    const activeTableInfo = db
+      .prepare("PRAGMA table_info(message_logs)")
+      .all() as any[];
     const hasCron = tableInfo.some((col) => col.name === "cronExpression");
+    const hasContactInLogs = activeTableInfo.some(
+      (col) => col.name === "contactName",
+    );
 
-    if (hasCron) {
-      console.log(
-        "Detected old schema (cronExpression). Dropping tables to migrate...",
-      );
+    if (hasCron || !hasContactInLogs) {
+      console.log("Detected schema change. Dropping tables to migrate...");
       db.exec("DROP TABLE IF EXISTS message_logs");
-      db.exec("DROP TABLE IF EXISTS schedules");
+      // Only drop schedules if it's the cron migration, but user said "delete all" is fine so we can be aggressive if needed.
+      // But to be nice, let's only drop schedules if it's the old cron one, or if we want to clean slate.
+      // User said "feel free to delete all". Let's drop schedules too to ensure consistency if we really want,
+      // but strictly speaking we only need to drop message_logs for this feature if schedules is fine.
+      // However, the previous code dropped both on 'hasCron'.
+      // If !hasContactInLogs, it means we have the 'old' message_logs from previous step.
+      // Let's drop message_logs.
     }
   } catch (err) {
     console.warn("Error checking schema:", err);
@@ -36,12 +45,15 @@ export function runMigrations(db: Database.Database) {
     );
   `);
 
-  // Message Logs Table
+  // Message Logs Table (History)
   db.exec(`
     CREATE TABLE IF NOT EXISTS message_logs (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
-      scheduleId INTEGER NOT NULL,
-      status TEXT NOT NULL CHECK(status IN ('sent', 'failed')),
+      scheduleId INTEGER, -- Nullable for instant messages
+      type TEXT NOT NULL CHECK(type IN ('instant', 'once', 'recurring')),
+      contactName TEXT NOT NULL,
+      message TEXT NOT NULL,
+      status TEXT NOT NULL CHECK(status IN ('sending', 'sent', 'failed')),
       timestamp TEXT DEFAULT CURRENT_TIMESTAMP,
       error TEXT,
       FOREIGN KEY (scheduleId) REFERENCES schedules(id) ON DELETE CASCADE

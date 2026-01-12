@@ -157,12 +157,11 @@ export class WhatsAppService {
     if (!this.page) return false;
 
     try {
-      // Wait a bit for page to load
-      await this.page.waitForTimeout(3000);
-
-      // Check if logged in by looking for search box
-      const searchBox = await this.page.$('div[role="textbox"]');
-      return searchBox !== null;
+      // Wait up to 10 seconds for the search box to appear
+      await this.page.waitForSelector('div[role="textbox"]', {
+        timeout: 10000,
+      });
+      return true;
     } catch (err) {
       return false;
     }

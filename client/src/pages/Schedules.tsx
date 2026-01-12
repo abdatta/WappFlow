@@ -2,6 +2,7 @@ import type { Schedule } from "@shared/types";
 import { Clock, RefreshCw, Trash2, Zap } from "lucide-preact";
 import { useEffect, useState } from "preact/hooks";
 import { Link } from "wouter-preact";
+import { HistoryList } from "../components/HistoryList";
 import { api } from "../services/api";
 import "./Schedules.css";
 
@@ -160,37 +161,7 @@ export function Schedules() {
             </div>
           </div>
 
-          <div class="schedule-section history-section">
-            <h3>History</h3>
-            <div class="schedule-list">
-              {schedules
-                .filter(
-                  (s) =>
-                    s.type === "instant" ||
-                    (s.type === "once" &&
-                      (s.status === "completed" ||
-                        s.status === "failed" ||
-                        s.status === "cancelled")),
-                )
-                .map((s) => (
-                  <ScheduleCard
-                    key={s.id}
-                    schedule={s}
-                    onDelete={handleDelete}
-                    getIcon={getIcon}
-                    getTimingText={getTimingText}
-                  />
-                ))}
-              {schedules.filter(
-                (s) =>
-                  s.type === "instant" ||
-                  (s.type === "once" &&
-                    (s.status === "completed" ||
-                      s.status === "failed" ||
-                      s.status === "cancelled")),
-              ).length === 0 && <p class="section-empty">No history</p>}
-            </div>
-          </div>
+          <HistoryList />
         </>
       )}
     </div>
