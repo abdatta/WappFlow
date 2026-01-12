@@ -76,9 +76,11 @@ router.delete("/:id", (req, res) => {
   const info = stmt.run(id);
 
   if (info.changes === 0) {
+    console.warn(`Failed to delete schedule ${id}: Not found`);
     return res.status(404).json({ error: "Schedule not found" });
   }
 
+  console.log(`Deleted schedule ${id}`);
   res.json({ success: true });
 });
 

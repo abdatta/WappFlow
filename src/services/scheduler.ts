@@ -7,8 +7,6 @@ class SchedulerService {
   private tasks: Map<number, cron.ScheduledTask> = new Map();
   private runningTasks: Set<number> = new Set();
 
-  constructor() {}
-
   init() {
     console.log("Initializing Scheduler...");
     this.loadSchedules();

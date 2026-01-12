@@ -5,6 +5,10 @@ import { WebSocketServer } from "ws";
 import "./db/db.js"; // Initialize DB
 import { schedulerService } from "./services/scheduler.js";
 import { whatsappService } from "./services/whatsapp.js";
+import { overrideConsole } from "./utils/logger.js";
+
+// Override console methods with timestamp
+overrideConsole();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -45,6 +49,7 @@ app.get("*", (req, res) => {
 const server = app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
   schedulerService.init();
+  whatsappService.checkAuthOnce();
 });
 
 // WebSocket Server for WhatsApp Connection

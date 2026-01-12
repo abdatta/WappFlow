@@ -34,8 +34,6 @@ export class WhatsAppService {
 
   constructor() {
     this.ensureDirectories();
-    // Check authentication status on boot, then close
-    this.checkAuthOnce();
   }
 
   private ensureDirectories() {

@@ -1,7 +1,6 @@
 import { Router } from "express";
-import { whatsappService } from "../services/whatsapp.js";
-
 import db from "../db/db.js";
+import { whatsappService } from "../services/whatsapp.js";
 
 const router = Router();
 
