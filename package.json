@@ -2,7 +2,7 @@
   "name": "wapp-flow",
   "version": "1.0.0",
   "description": "WhatsApp Scheduler PWA",
-  "main": "dist/server.js",
+  "main": "dist/src/server.js",
   "workspaces": [
     "client"
   ],
@@ -13,7 +13,7 @@
     "build": "npm run build:client && npm run build:server",
     "build:client": "npm run build --workspace=client",
     "build:server": "tsc -p tsconfig.json",
-    "start": "node dist/server.js",
+    "start": "node dist/src/server.js",
     "format": "prettier --write .",
     "prepare": "husky",
     "lint-staged": "lint-staged"

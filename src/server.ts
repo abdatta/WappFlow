@@ -1,4 +1,5 @@
 import { randomUUID } from "crypto";
+import "dotenv/config";
 import express from "express";
 import path from "path";
 import { WebSocketServer } from "ws";

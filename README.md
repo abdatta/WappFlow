@@ -57,7 +57,16 @@
 
    _Note: This installs backend dependencies in the root `node_modules` and frontend dependencies in `client/node_modules`._
 
-3. **Start Development Server**
+3. **Configure Environment**
+   Copy the example environment file to create your local configuration:
+
+   ```bash
+   cp .env.example .env
+   ```
+
+   You can edit `.env` to configure the `PORT` (default is 3000).
+
+4. **Start Development Server**
    To run both the backend server and the frontend client concurrently:
 
    ```bash
