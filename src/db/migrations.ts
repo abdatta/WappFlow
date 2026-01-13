@@ -77,5 +77,15 @@ export function runMigrations(db: Database.Database) {
     );
   `);
 
+  // Feedbacks Table
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS feedbacks (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      content TEXT NOT NULL,
+      isAddressed INTEGER DEFAULT 0, -- 0 for false, 1 for true
+      createdAt TEXT DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+
   console.log("Migrations applied successfully.");
 }

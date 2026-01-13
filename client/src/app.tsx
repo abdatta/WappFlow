@@ -1,9 +1,10 @@
 import { useEffect, useState } from "preact/hooks";
-import { Switch, Route } from "wouter-preact";
+import { Route, Switch } from "wouter-preact";
 import { Layout } from "./components/Layout";
 import { ConnectWhatsApp } from "./pages/ConnectWhatsApp";
-import { Schedules } from "./pages/Schedules";
 import { CreateSchedule } from "./pages/CreateSchedule";
+import { Feedbacks } from "./pages/Feedbacks";
+import { Schedules } from "./pages/Schedules";
 import { Settings } from "./pages/Settings";
 import { api } from "./services/api";
 
@@ -48,6 +49,7 @@ export function App() {
       <Switch>
         <Route path="/" component={Schedules} />
         <Route path="/create" component={CreateSchedule} />
+        <Route path="/feedbacks" component={Feedbacks} />
         <Route path="/settings" component={Settings} />
         <Route>
           <div style={{ padding: "2rem", textAlign: "center" }}>

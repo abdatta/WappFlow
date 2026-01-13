@@ -37,3 +37,19 @@ export interface CreateScheduleDto {
   intervalUnit?: "minute" | "hour" | "day" | "week" | "month";
   toleranceMinutes?: number;
 }
+
+export interface Feedback {
+  id: number;
+  content: string;
+  isAddressed: boolean;
+  createdAt: string;
+}
+
+export interface CreateFeedbackDto {
+  content: string;
+}
+
+export interface UpdateFeedbackDto {
+  content?: string;
+  isAddressed?: boolean;
+}

@@ -34,6 +34,9 @@ app.use("/api/notifications", notificationsRouter);
 import historyRouter from "./api/history.js";
 app.use("/api/history", historyRouter);
 
+import feedbacksRouter from "./api/feedbacks.js";
+app.use("/api/feedbacks", feedbacksRouter);
+
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok", time: new Date().toISOString() });
 });

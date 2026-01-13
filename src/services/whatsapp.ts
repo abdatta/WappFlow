@@ -410,7 +410,7 @@ export class WhatsAppService {
 
       await this.page.keyboard.type(message);
       await this.page.keyboard.press("Enter");
-      await delay(1000);
+      await delay(5000);
       await this.returnToChatList();
 
       console.log("Message sent successfully via contact search");

@@ -74,4 +74,41 @@ export const api = {
     });
     if (!res.ok) throw new Error("Failed to subscribe");
   },
+
+  // Feedbacks
+  getFeedbacks: async (): Promise<any[]> => {
+    const res = await fetch(`${API_BASE}/feedbacks`);
+    if (!res.ok) throw new Error("Failed to fetch feedbacks");
+    return res.json();
+  },
+
+  createFeedback: async (content: string): Promise<any> => {
+    const res = await fetch(`${API_BASE}/feedbacks`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ content }),
+    });
+    if (!res.ok) throw new Error("Failed to create feedback");
+    return res.json();
+  },
+
+  updateFeedback: async (
+    id: number,
+    data: { content?: string; isAddressed?: boolean },
+  ): Promise<any> => {
+    const res = await fetch(`${API_BASE}/feedbacks/${id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) throw new Error("Failed to update feedback");
+    return res.json();
+  },
+
+  deleteFeedback: async (id: number): Promise<void> => {
+    const res = await fetch(`${API_BASE}/feedbacks/${id}`, {
+      method: "DELETE",
+    });
+    if (!res.ok) throw new Error("Failed to delete feedback");
+  },
 };
