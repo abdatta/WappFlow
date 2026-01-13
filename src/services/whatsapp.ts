@@ -104,10 +104,11 @@ export class WhatsAppService {
       USER_DATA_DIR,
       {
         headless: true,
-        viewport: { width: 1280, height: 960 },
+        viewport: null,
         userAgent:
           "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
         args: [
+          "--window-size=1280,960",
           "--disable-blink-features=AutomationControlled", // Critical for stealth
           "--disable-extensions",
           "--disable-dev-shm-usage",
@@ -442,7 +443,35 @@ export class WhatsAppService {
 
       await this.page.keyboard.type(message);
       await this.page.keyboard.press("Enter");
-      await delay(5000);
+
+      // Wait for message to be sent (status != 'Pending')
+      // Using locator API as requested: verify last message's status icon
+      console.log("Waiting for message status to update from Pending...");
+      await this.page
+        .waitForFunction(
+          () => {
+            const allMessages = document.querySelectorAll(".message-out");
+            const lastMessage = allMessages[allMessages.length - 1];
+            if (!lastMessage) return false;
+
+            const svg = lastMessage.querySelector("svg");
+            // The status icon container is the parent of the SVG
+            const statusContainer = svg?.parentElement;
+
+            if (!statusContainer) return false;
+
+            const label = statusContainer.getAttribute("aria-label");
+            return label && label.trim() !== "Pending";
+          },
+          null, // No arguments passed
+          { timeout: 30000 },
+        )
+        .catch((err) => {
+          throw new Error(
+            `Message status verification timed out: ${err.message}. This likely means the message remained 'Pending' or wasn't found.`,
+          );
+        });
+
       await this.returnToChatList();
 
       console.log("Message sent successfully via contact search");

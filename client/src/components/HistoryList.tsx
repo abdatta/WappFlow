@@ -1,4 +1,4 @@
-import { Download, FileSearch } from "lucide-preact";
+import { Download } from "lucide-preact";
 import { useEffect, useState } from "preact/hooks";
 import { api } from "../services/api";
 import "./HistoryList.css";
@@ -94,7 +94,7 @@ export function HistoryList() {
                         marginRight: "0.5rem",
                       }}
                     >
-                      <FileSearch size={16} />
+                      <Download size={16} />
                     </span>
                   )}
                   {log.status === "sending" && <span class="spinner">⏳</span>}

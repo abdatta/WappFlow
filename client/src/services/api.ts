@@ -49,6 +49,18 @@ export const api = {
     if (!res.ok) throw new Error("Failed to delete schedule");
   },
 
+  updateScheduleStatus: async (
+    id: number,
+    status: "active" | "paused",
+  ): Promise<void> => {
+    const res = await fetch(`${API_BASE}/schedules/${id}/status`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status }),
+    });
+    if (!res.ok) throw new Error("Failed to update status");
+  },
+
   // WhatsApp
   getWhatsAppStatus: async (): Promise<{
     authenticated: boolean;

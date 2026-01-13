@@ -1,5 +1,5 @@
 import type { Schedule } from "@shared/types";
-import { Clock, RefreshCw, Trash2, Zap } from "lucide-preact";
+import { Clock, Pause, Play, RefreshCw, Trash2, Zap } from "lucide-preact";
 import { useEffect, useState } from "preact/hooks";
 import { Link } from "wouter-preact";
 import { HistoryList } from "../components/HistoryList";
@@ -32,6 +32,17 @@ export function Schedules() {
     if (confirm("Delete this schedule?")) {
       await api.deleteSchedule(id);
       loadSchedules();
+    }
+  };
+
+  const handleTogglePause = async (schedule: Schedule) => {
+    try {
+      const newStatus = schedule.status === "active" ? "paused" : "active";
+      await api.updateScheduleStatus(schedule.id, newStatus);
+      loadSchedules();
+    } catch (err) {
+      console.error("Failed to toggle pause status", err);
+      alert("Failed to update status");
     }
   };
 
@@ -84,6 +95,8 @@ export function Schedules() {
 
   const getTimingText = (schedule: Schedule) => {
     const type = schedule.type;
+    // Show Paused status clearly
+    const statusPrefix = schedule.status === "paused" ? "(Paused) " : "";
 
     if (type === "instant") {
       if (schedule.lastRun) {
@@ -95,7 +108,7 @@ export function Schedules() {
 
     if (type === "once" && schedule.scheduleTime) {
       const date = new Date(schedule.scheduleTime);
-      return `Scheduled for ${formatFriendlyDate(date)}`;
+      return `${statusPrefix}Scheduled for ${formatFriendlyDate(date)}`;
     }
 
     if (type === "recurring") {
@@ -104,7 +117,7 @@ export function Schedules() {
       const unitStr = value > 1 ? `${unit}s` : unit;
       const valuePrefix = value > 1 ? ` ${value}` : "";
 
-      let text = `Every${valuePrefix} ${unitStr}`;
+      let text = `${statusPrefix}Every${valuePrefix} ${unitStr}`;
 
       if (schedule.nextRun) {
         text += `. Next Run: ${formatFriendlyDate(new Date(schedule.nextRun))}`;
@@ -139,13 +152,16 @@ export function Schedules() {
                   (s) =>
                     s.type === "recurring" ||
                     (s.type === "once" &&
-                      (s.status === "pending" || s.status === "active")),
+                      (s.status === "pending" ||
+                        s.status === "active" ||
+                        s.status === "paused")),
                 )
                 .map((s) => (
                   <ScheduleCard
                     key={s.id}
                     schedule={s}
                     onDelete={handleDelete}
+                    onTogglePause={handleTogglePause}
                     getIcon={getIcon}
                     getTimingText={getTimingText}
                   />
@@ -154,7 +170,9 @@ export function Schedules() {
                 (s) =>
                   s.type === "recurring" ||
                   (s.type === "once" &&
-                    (s.status === "pending" || s.status === "active")),
+                    (s.status === "pending" ||
+                      s.status === "active" ||
+                      s.status === "paused")),
               ).length === 0 && (
                 <p class="section-empty">No active schedules</p>
               )}
@@ -171,15 +189,20 @@ export function Schedules() {
 function ScheduleCard({
   schedule,
   onDelete,
+  onTogglePause,
   getIcon,
   getTimingText,
 }: {
   schedule: Schedule;
   onDelete: (id: number) => void;
+  onTogglePause: (schedule: Schedule) => void;
   getIcon: (type: string) => any;
   getTimingText: (s: Schedule) => string;
 }) {
   const s = schedule;
+  const isRecurring = s.type === "recurring";
+  const isPaused = s.status === "paused";
+
   return (
     <div class={`schedule-card status-${s.status}`}>
       <div class="schedule-header">
@@ -187,9 +210,20 @@ function ScheduleCard({
           {getIcon(s.type)}
           <span>{getTimingText(s)}</span>
         </div>
-        <button onClick={() => onDelete(s.id)} class="btn-icon">
-          <Trash2 size={18} />
-        </button>
+        <div class="schedule-actions">
+          {isRecurring && (
+            <button
+              onClick={() => onTogglePause(s)}
+              class="btn-icon"
+              title={isPaused ? "Resume" : "Pause"}
+            >
+              {isPaused ? <Play size={18} /> : <Pause size={18} />}
+            </button>
+          )}
+          <button onClick={() => onDelete(s.id)} class="btn-icon">
+            <Trash2 size={18} />
+          </button>
+        </div>
       </div>
 
       <div class="schedule-body">

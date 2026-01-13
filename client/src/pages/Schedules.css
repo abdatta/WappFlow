@@ -32,6 +32,12 @@
   gap: 0.75rem;
 }
 
+.schedule-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
 .schedule-timing {
   display: flex;
   align-items: center;

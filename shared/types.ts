@@ -14,7 +14,13 @@ export interface Schedule {
   intervalValue?: number;
   intervalUnit?: "minute" | "hour" | "day" | "week" | "month";
   toleranceMinutes?: number;
-  status: "pending" | "active" | "completed" | "failed" | "cancelled";
+  status:
+    | "pending"
+    | "active"
+    | "completed"
+    | "failed"
+    | "cancelled"
+    | "paused";
   lastRun?: string;
   nextRun?: string;
   createdAt: string;

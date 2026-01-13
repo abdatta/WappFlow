@@ -84,4 +84,25 @@ router.delete("/:id", (req, res) => {
   res.json({ success: true });
 });
 
+// PATCH update status (access: pause/resume)
+router.patch("/:id/status", (req, res) => {
+  const { id } = req.params;
+  const { status } = req.body;
+
+  if (status !== "active" && status !== "paused") {
+    return res
+      .status(400)
+      .json({ error: "Invalid status. Use 'active' or 'paused'." });
+  }
+
+  const stmt = db.prepare("UPDATE schedules SET status = ? WHERE id = ?");
+  const info = stmt.run(status, id);
+
+  if (info.changes === 0) {
+    return res.status(404).json({ error: "Schedule not found" });
+  }
+
+  res.json({ success: true, status });
+});
+
 export default router;
