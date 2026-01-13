@@ -111,4 +111,20 @@ export const api = {
     });
     if (!res.ok) throw new Error("Failed to delete feedback");
   },
+
+  // Settings
+  getSetting: async (key: string): Promise<string | null> => {
+    const res = await fetch(`${API_BASE}/settings/${key}`);
+    if (!res.ok) throw new Error("Failed to get setting");
+    return (await res.json()).value;
+  },
+
+  updateSetting: async (key: string, value: string): Promise<void> => {
+    const res = await fetch(`${API_BASE}/settings/${key}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ value }),
+    });
+    if (!res.ok) throw new Error("Failed to update setting");
+  },
 };

@@ -1,12 +1,31 @@
-import { useState } from "preact/hooks";
+import { Activity, Bell, Info } from "lucide-preact";
+import { useEffect, useState } from "preact/hooks";
 import { api } from "../services/api";
-import { Bell, Info } from "lucide-preact";
 import "./Settings.css";
 
 export function Settings() {
   const [notifPermission, setNotifPermission] = useState(
     Notification.permission,
   );
+  const [tracingEnabled, setTracingEnabled] = useState(false);
+
+  useEffect(() => {
+    api
+      .getSetting("enable_tracing")
+      .then((val) => setTracingEnabled(val === "true"));
+  }, []);
+
+  const toggleTracing = async () => {
+    const newVal = !tracingEnabled;
+    setTracingEnabled(newVal);
+    try {
+      await api.updateSetting("enable_tracing", String(newVal));
+    } catch (err) {
+      setTracingEnabled(!newVal);
+      console.error(err);
+      alert("Failed to update setting");
+    }
+  };
 
   const enableNotifications = async () => {
     try {
@@ -70,6 +89,33 @@ export function Settings() {
         ) : (
           <p class="success">Notifications are enabled for this device.</p>
         )}
+      </div>
+
+      <div class="card">
+        <h3>
+          <Activity size={20} />
+          Debugging
+        </h3>
+        <p>Enable Playwright tracing to debug message sending issues.</p>
+        <div
+          class="setting-row"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            marginTop: "1rem",
+          }}
+        >
+          <span>Enable Tracing</span>
+          <label class="switch">
+            <input
+              type="checkbox"
+              checked={tracingEnabled}
+              onChange={toggleTracing}
+            />
+            <span class="slider round"></span>
+          </label>
+        </div>
       </div>
 
       <div class="card about-section">

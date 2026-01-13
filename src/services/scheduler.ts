@@ -219,7 +219,11 @@ class SchedulerService {
 
     try {
       // Use contact-based sending logic
-      await whatsappService.sendMessage(schedule.contactName, schedule.message);
+      await whatsappService.sendMessage(
+        schedule.contactName,
+        schedule.message,
+        logId,
+      );
 
       // Update stats
       const now = new Date().toISOString();

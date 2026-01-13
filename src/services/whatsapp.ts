@@ -1,6 +1,7 @@
 import fs from "fs";
 import path from "path";
 import { BrowserContext, chromium, Page } from "playwright";
+import db from "../db/db.js";
 
 // Utility function for human-like delays
 function delay(ms: number): Promise<void> {
@@ -9,6 +10,12 @@ function delay(ms: number): Promise<void> {
 
 const USER_DATA_DIR = path.resolve("data/whatsapp_session");
 const STATUS_FILE = path.resolve("data/whatsapp_session_status.json");
+const TRACES_DIR = path.resolve("data/traces");
+
+// Ensure traces directory exists
+if (!fs.existsSync(TRACES_DIR)) {
+  fs.mkdirSync(TRACES_DIR, { recursive: true });
+}
 
 interface SessionStatus {
   authenticated: boolean;
@@ -369,8 +376,23 @@ export class WhatsAppService {
     }
   }
 
-  async sendMessage(contactName: string, message: string): Promise<void> {
+  async sendMessage(
+    contactName: string,
+    message: string,
+    logId?: number | bigint,
+  ): Promise<void> {
     console.log(`Attempting to send message to contact: ${contactName}`);
+
+    // Check if tracing is enabled
+    let tracingEnabled = false;
+    try {
+      const setting = db
+        .prepare("SELECT value FROM settings WHERE key = 'enable_tracing'")
+        .get() as { value: string } | undefined;
+      tracingEnabled = setting?.value === "true";
+    } catch (err) {
+      console.error("Failed to check tracing setting:", err);
+    }
 
     try {
       await this.openBrowser();
@@ -401,6 +423,16 @@ export class WhatsAppService {
       await this.page.click(`span[title='${contactName}']`);
       await this.page.waitForSelector(composerSelector, { timeout: 15000 });
 
+      // Start tracing if enabled and context is available
+      if (tracingEnabled && this.browserContext) {
+        console.log(`Starting trace for logId: ${logId}`);
+        await this.browserContext.tracing.start({
+          screenshots: true,
+          snapshots: true,
+          sources: true,
+        });
+      }
+
       // Type and send the message
       await delay(400 + Math.random() * 800);
       // Clear any existing text first
@@ -414,9 +446,27 @@ export class WhatsAppService {
       await this.returnToChatList();
 
       console.log("Message sent successfully via contact search");
+
+      if (tracingEnabled && this.browserContext && logId) {
+        const tracePath = path.join(TRACES_DIR, `trace_${logId}.zip`);
+        await this.browserContext.tracing.stop({ path: tracePath });
+        console.log(`Trace saved to: ${tracePath}`);
+      }
+
       await this.closeBrowser();
     } catch (err: any) {
       console.error("Failed to send message to contact:", err);
+
+      if (tracingEnabled && this.browserContext && logId) {
+        try {
+          const tracePath = path.join(TRACES_DIR, `trace_${logId}.zip`);
+          await this.browserContext.tracing.stop({ path: tracePath });
+          console.log(`Trace saved to: ${tracePath} (after failure)`);
+        } catch (traceErr) {
+          console.error("Failed to save trace after error:", traceErr);
+        }
+      }
+
       await this.closeBrowser();
       throw err;
     }

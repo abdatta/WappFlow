@@ -1,3 +1,4 @@
+import { Download, FileSearch } from "lucide-preact";
 import { useEffect, useState } from "preact/hooks";
 import { api } from "../services/api";
 import "./HistoryList.css";
@@ -10,6 +11,7 @@ interface Log {
   status: "sending" | "sent" | "failed";
   timestamp: number;
   error?: string;
+  hasTrace?: boolean;
 }
 
 const formatHistoryTime = (timestamp: number) => {
@@ -71,7 +73,6 @@ export function HistoryList() {
               <div
                 class="history-header"
                 onClick={() =>
-                  log.error &&
                   setExpandedId(expandedId === log.id ? null : log.id)
                 }
               >
@@ -83,6 +84,19 @@ export function HistoryList() {
                   </span>
                 </div>
                 <div class="history-status">
+                  {log.hasTrace && (
+                    <span
+                      title="Trace available"
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        color: "var(--text-secondary)",
+                        marginRight: "0.5rem",
+                      }}
+                    >
+                      <FileSearch size={16} />
+                    </span>
+                  )}
                   {log.status === "sending" && <span class="spinner">⏳</span>}
                   {log.status === "sent" && (
                     <span class="icon-success">✅</span>
@@ -98,6 +112,45 @@ export function HistoryList() {
                 {log.error && expandedId === log.id && (
                   <div class="error-details">
                     <strong>Error:</strong> {log.error}
+                  </div>
+                )}
+                {log.hasTrace && expandedId === log.id && (
+                  <div class="trace-download" style={{ marginTop: "0.5rem" }}>
+                    <a
+                      href={`/api/history/${log.id}/trace`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      class="btn-small"
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "0.5rem",
+                        padding: "0.5rem 1rem",
+                        background: "var(--bg-elevated)",
+                        border: "1px solid var(--border)",
+                        borderRadius: "var(--radius-md)",
+                        color: "var(--text)",
+                        textDecoration: "none",
+                        fontSize: "0.875rem",
+                        fontWeight: 500,
+                      }}
+                    >
+                      <Download size={16} />
+                      Download Trace
+                    </a>
+                  </div>
+                )}
+                {!log.hasTrace && expandedId === log.id && (
+                  <div
+                    class="trace-missing"
+                    style={{
+                      marginTop: "0.5rem",
+                      fontSize: "0.875rem",
+                      color: "var(--text-secondary)",
+                      fontStyle: "italic",
+                    }}
+                  >
+                    No trace found
                   </div>
                 )}
               </div>

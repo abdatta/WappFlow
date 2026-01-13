@@ -25,7 +25,7 @@ router.post("/send", async (req, res) => {
   const logId = info.lastInsertRowid;
 
   try {
-    await whatsappService.sendMessage(contactName, message);
+    await whatsappService.sendMessage(contactName, message, logId);
 
     // Update to 'sent'
     db.prepare("UPDATE message_logs SET status = 'sent' WHERE id = ?").run(
