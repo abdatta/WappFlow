@@ -1,6 +1,7 @@
 import { useEffect, useState } from "preact/hooks";
 import { Route, Switch } from "wouter-preact";
 import { Layout } from "./components/Layout";
+import { ReloadPrompt } from "./components/ReloadPrompt";
 import { ConnectWhatsApp } from "./pages/ConnectWhatsApp";
 import { CreateSchedule } from "./pages/CreateSchedule";
 import { Feedbacks } from "./pages/Feedbacks";
@@ -58,6 +59,7 @@ export function App() {
           </div>
         </Route>
       </Switch>
+      <ReloadPrompt />
     </Layout>
   );
 }

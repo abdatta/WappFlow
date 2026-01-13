@@ -13,7 +13,15 @@ export default defineConfig(({ mode }) => {
     plugins: [
       preact(),
       VitePWA({
-        registerType: "autoUpdate",
+        registerType: "prompt",
+        devOptions: {
+          enabled: true,
+        },
+        workbox: {
+          cleanupOutdatedCaches: true,
+          clientsClaim: true,
+          skipWaiting: true,
+        },
         includeAssets: [
           "favicon.svg",
           "apple-touch-icon.png",
