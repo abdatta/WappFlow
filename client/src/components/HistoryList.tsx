@@ -116,10 +116,27 @@ export function HistoryList() {
                 )}
                 {log.hasTrace && expandedId === log.id && (
                   <div class="trace-download" style={{ marginTop: "0.5rem" }}>
-                    <a
-                      href={`/api/history/${log.id}/trace`}
-                      target="_blank"
-                      rel="noopener noreferrer"
+                    <button
+                      onClick={async () => {
+                        try {
+                          const response = await fetch(
+                            `/api/history/${log.id}/trace`,
+                          );
+                          if (!response.ok) throw new Error("Download failed");
+                          const blob = await response.blob();
+                          const url = window.URL.createObjectURL(blob);
+                          const a = document.createElement("a");
+                          a.href = url;
+                          a.download = `trace_${log.id}.zip`;
+                          document.body.appendChild(a);
+                          a.click();
+                          window.URL.revokeObjectURL(url);
+                          document.body.removeChild(a);
+                        } catch (error) {
+                          console.error("Error downloading trace:", error);
+                          alert("Failed to download trace");
+                        }
+                      }}
                       class="btn-small"
                       style={{
                         display: "inline-flex",
@@ -133,11 +150,12 @@ export function HistoryList() {
                         textDecoration: "none",
                         fontSize: "0.875rem",
                         fontWeight: 500,
+                        cursor: "pointer",
                       }}
                     >
                       <Download size={16} />
                       Download Trace
-                    </a>
+                    </button>
                   </div>
                 )}
                 {!log.hasTrace && expandedId === log.id && (
