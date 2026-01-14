@@ -12,6 +12,9 @@ const USER_DATA_DIR = path.resolve("data/whatsapp_session");
 const STATUS_FILE = path.resolve("data/whatsapp_session_status.json");
 const TRACES_DIR = path.resolve("data/traces");
 
+// Configuration: Keep browser open until this second of the minute (0-59)
+const BROWSER_CLOSE_TARGET_SECOND = 55;
+
 // Ensure traces directory exists
 if (!fs.existsSync(TRACES_DIR)) {
   fs.mkdirSync(TRACES_DIR, { recursive: true });
@@ -120,10 +123,6 @@ export class WhatsAppService {
 
     this.page =
       this.browserContext.pages()[0] || (await this.browserContext.newPage());
-
-    this.page.on("console", (msg) => {
-      console.log(`[Browser] ${msg.type().toUpperCase()}: ${msg.text()}`);
-    });
 
     // Hide webdriver property and other automation indicators
     await this.page.addInitScript(() => {
@@ -368,16 +367,86 @@ export class WhatsAppService {
     await delay(1000);
   }
 
-  private async returnToChatList(): Promise<void> {
-    if (!this.page) return;
+  // Method to open a specific chat by name
+  async openChat(contactName: string): Promise<void> {
+    if (!this.page) throw new Error("Page not initialized");
+
+    console.log(`Opening chat: ${contactName}`);
+    const searchSelector = "div[contenteditable='true'][data-tab='3']";
+    const composerSelector = "div[contenteditable='true'][data-tab]";
+
     try {
-      // Navigate back to main WhatsApp page to avoid staying in a conversation
-      await this.page.goto("https://web.whatsapp.com", {
-        waitUntil: "networkidle",
+      // Search for the contact by name
+      // Sometimes just clicking search is enough, but to be safe we clear and retype
+      await this.page.click(searchSelector);
+
+      // Clear search box first ensuring we don't append to previous search
+      await this.page.keyboard.press("Control+A");
+      await this.page.keyboard.press("Backspace");
+
+      await this.page.fill(searchSelector, contactName);
+
+      // Wait for the specific contact in list
+      await this.page.waitForSelector(`span[title='${contactName}']`, {
+        timeout: 15000,
       });
-      await delay(500);
+
+      // Click the contact in the search results to open the chat
+      await this.page.click(`span[title='${contactName}']`);
+
+      // Wait for chat composer to be ready
+      await this.page.waitForSelector(composerSelector, { timeout: 15000 });
+      console.log(`Chat opened: ${contactName}`);
     } catch (err) {
-      console.error("Failed to switch to main chat:", err);
+      console.error(`Failed to open chat '${contactName}':`, err);
+      throw err;
+    }
+  }
+
+  private async waitUntilTargetSecond(): Promise<void> {
+    // Check if configuration is valid (0-59)
+    if (BROWSER_CLOSE_TARGET_SECOND < 0 || BROWSER_CLOSE_TARGET_SECOND > 59) {
+      console.warn(
+        `Invalid BROWSER_CLOSE_TARGET_SECOND: ${BROWSER_CLOSE_TARGET_SECOND}. Skipping wait.`
+      );
+      return;
+    }
+
+    const now = new Date();
+    const currentSecond = now.getSeconds();
+
+    // If we are already past the target second, we don't wait (or waiting would mean waiting for the NEXT minute, which might be too long/unintended?)
+    // Requirement says: "untill thr 55th second of the minute at least"
+    // Interpretation: If it's currently 10s, wait 45s. If it's 58s, closing immediately is fine (met "at least").
+    // OR: If it's 58s, it means we passed the 55th second of THIS minute, so we are good.
+
+    if (currentSecond >= BROWSER_CLOSE_TARGET_SECOND) {
+      console.log(
+        `Current second (${currentSecond}) >= target (${BROWSER_CLOSE_TARGET_SECOND}). Closing immediately.`
+      );
+      return;
+    }
+
+    const secondsToWait = BROWSER_CLOSE_TARGET_SECOND - currentSecond;
+    const msToWait = secondsToWait * 1000;
+
+    console.log(
+      `Waiting ${secondsToWait} seconds until the ${BROWSER_CLOSE_TARGET_SECOND}th second of the minute...`
+    );
+    await delay(msToWait);
+  }
+
+  private async returnToDefaultChat(): Promise<void> {
+    const defaultChat = process.env.WHATSAPP_DEFAULT_CHAT;
+    if (defaultChat) {
+      try {
+        await this.openChat(defaultChat);
+      } catch (e) {
+        console.warn(
+          `Failed to return to default chat '${defaultChat}'. Details:`,
+          e
+        );
+      }
     }
   }
 
@@ -414,19 +483,8 @@ export class WhatsAppService {
       if (!this.page) throw new Error("Driver not initialized");
       await this.ensureReady();
 
-      const searchSelector = "div[contenteditable='true'][data-tab='3']";
-      const composerSelector = "div[contenteditable='true'][data-tab]";
-
-      // Search for the contact by name
-      await this.page.click(searchSelector);
-      await this.page.fill(searchSelector, contactName);
-      await this.page.waitForSelector(`span[title='${contactName}']`, {
-        timeout: 15000,
-      });
-
-      // Click the contact in the search results to open the chat
-      await this.page.click(`span[title='${contactName}']`);
-      await this.page.waitForSelector(composerSelector, { timeout: 15000 });
+      // Open the target chat
+      await this.openChat(contactName);
 
       // Start tracing if enabled and context is available
       if (tracingEnabled && this.browserContext) {
@@ -491,7 +549,10 @@ export class WhatsAppService {
           );
         });
 
-      await this.returnToChatList();
+      // Return to default chat instead of chat list
+      // This is crucial: if we keep the recipient's chat open, their reply might be auto-read if they reply quickly.
+      // Switching to a "safe" default chat (like 'Me' or 'Saved Messages') prevents this unintended read receipt.
+      await this.returnToDefaultChat();
 
       console.log("Message sent successfully via contact search");
 
@@ -501,6 +562,7 @@ export class WhatsAppService {
         console.log(`Trace saved to: ${tracePath}`);
       }
 
+      await this.waitUntilTargetSecond();
       await this.closeBrowser();
     } catch (err: any) {
       console.error("Failed to send message to contact:", err);
@@ -514,6 +576,15 @@ export class WhatsAppService {
           console.error("Failed to save trace after error:", traceErr);
         }
       }
+
+      await this.waitUntilTargetSecond(); // Wait before closing on error too? Usually safer to keep pattern consistent or fail fast.
+      // Requirement: "from the moment a task starts... it should remain open untill thr 55th second... It can exceed that if need be"
+      // So yes, even on error we should hypothetically wait, but often errors need fast feedback.
+      // However, "fail fast" usually wins. But let's stick to valid "task starts... keep browser open".
+      // Let's apply it to success path first and foremost. For error, maybe better to close fast?
+      // Re-reading: "make sure that from the moment a task starts... it is done with its stuff before that it should still keep the browser open"
+      // If it fails, it's technically "done with its stuff".
+      // I'll add it to the error path as well for consistency, unless user complains.
 
       await this.closeBrowser();
       throw err;

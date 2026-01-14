@@ -14,6 +14,14 @@ overrideConsole();
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Validate required environment variables
+if (!process.env.WHATSAPP_DEFAULT_CHAT) {
+  console.error(
+    "FATAL: WHATSAPP_DEFAULT_CHAT environment variable is not set. Please set it to the name of the chat used as the default landing page."
+  );
+  process.exit(1);
+}
+
 // Middleware
 app.use(express.json());
 

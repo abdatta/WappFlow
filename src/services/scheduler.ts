@@ -31,6 +31,55 @@ class SchedulerService {
     }
   }
 
+  pauseSchedule(id: number) {
+    console.log(`Pausing schedule ${id}...`);
+    // Update DB: status = 'paused', nextRun = NULL
+    db.prepare(
+      "UPDATE schedules SET status = 'paused', nextRun = NULL WHERE id = ?"
+    ).run(id);
+
+    // Stop any in-memory tasks if we had them (legacy cron support but good cleanup)
+    if (this.tasks.has(id)) {
+      this.tasks.get(id)?.stop();
+    }
+  }
+
+  resumeSchedule(id: number) {
+    console.log(`Resuming schedule ${id}...`);
+
+    const schedule = db
+      .prepare("SELECT * FROM schedules WHERE id = ?")
+      .get(id) as Schedule;
+    if (!schedule) throw new Error("Schedule not found");
+
+    if (schedule.type === "recurring" && schedule.intervalValue) {
+      // Re-anchor scheduleTime to NOW so intervals calculate from this moment
+      // This "resets" the schedule effectively
+      const now = new Date();
+      const nowIso = now.toISOString();
+
+      // Update scheduleTime to now (re-anchor)
+      // Then calculate nextRun
+
+      // Momentarily update in-memory object to calculate nextRun based on new baseTime
+      schedule.scheduleTime = nowIso;
+
+      // Calculate next run immediately based on 'now'
+      const nextRunIso = this.updateNextRun(schedule, false); // false = not "after execution", just calculating
+
+      db.prepare(
+        "UPDATE schedules SET status = 'active', scheduleTime = ?, nextRun = ? WHERE id = ?"
+      ).run(nowIso, nextRunIso, id);
+
+      console.log(
+        `Resumed Schedule ${id}. Re-anchored to ${nowIso}, next run: ${nextRunIso}`
+      );
+    } else {
+      // For one-time schedules, just active it. If it's in the past it will run immediately.
+      db.prepare("UPDATE schedules SET status = 'active' WHERE id = ?").run(id);
+    }
+  }
+
   async checkSchedules() {
     const status = whatsappService.getStatus();
     if (!status.authenticated) {

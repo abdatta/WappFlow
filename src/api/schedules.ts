@@ -5,6 +5,7 @@ import db from "../db/db.js";
 import { createScheduleSchema } from "../validations/scheduleSchemas.js";
 
 import { whatsappService } from "../services/whatsapp.js";
+import { schedulerService } from "../services/scheduler.js";
 
 const router = Router();
 
@@ -95,11 +96,14 @@ router.patch("/:id/status", (req, res) => {
       .json({ error: "Invalid status. Use 'active' or 'paused'." });
   }
 
-  const stmt = db.prepare("UPDATE schedules SET status = ? WHERE id = ?");
-  const info = stmt.run(status, id);
-
-  if (info.changes === 0) {
-    return res.status(404).json({ error: "Schedule not found" });
+  try {
+    if (status === "paused") {
+      schedulerService.pauseSchedule(Number(id));
+    } else if (status === "active") {
+      schedulerService.resumeSchedule(Number(id));
+    }
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
   }
 
   res.json({ success: true, status });
