@@ -443,6 +443,7 @@ export class WhatsAppService {
 
       await this.page.keyboard.type(message);
       await this.page.keyboard.press("Enter");
+      await delay(2000);
 
       // Wait for message to be sent (status != 'Pending')
       // Using locator API as requested: verify last message's status icon
@@ -464,7 +465,7 @@ export class WhatsAppService {
             return label && label.trim() !== "Pending";
           },
           null, // No arguments passed
-          { timeout: 30000 }
+          { timeout: 20000 }
         )
         .catch((err) => {
           throw new Error(
