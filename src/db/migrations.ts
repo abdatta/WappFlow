@@ -24,6 +24,61 @@ export function runMigrations(db: Database.Database) {
       // Let's drop message_logs.
     }
 
+    // CHECK FOR BROKEN FOREIGN KEYS (Fix for 'schedules_old' issue)
+    try {
+      const fks = db
+        .prepare("PRAGMA foreign_key_list(message_logs)")
+        .all() as any[];
+      const brokenFk = fks.find((fk) => fk.table === "schedules_old");
+      if (brokenFk) {
+        console.log(
+          "Detected broken foreign key pointing to 'schedules_old'. Repairing message_logs..."
+        );
+        db.exec("BEGIN TRANSACTION");
+        try {
+          // 1. Rename broken table
+          db.exec("ALTER TABLE message_logs RENAME TO message_logs_broken");
+
+          // 2. Create new table (definition below will be used, but we need strictly valid schema now)
+          // We can use the same definition as the main creation block
+          db.exec(`
+            CREATE TABLE IF NOT EXISTS message_logs (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              scheduleId INTEGER,
+              type TEXT NOT NULL CHECK(type IN ('instant', 'once', 'recurring')),
+              contactName TEXT NOT NULL,
+              message TEXT NOT NULL,
+              status TEXT NOT NULL CHECK(status IN ('sending', 'sent', 'failed')),
+              timestamp TEXT DEFAULT CURRENT_TIMESTAMP,
+              error TEXT,
+              FOREIGN KEY (scheduleId) REFERENCES schedules(id) ON DELETE CASCADE
+            );
+          `);
+
+          // 3. Copy data
+          db.exec(`
+            INSERT INTO message_logs (id, scheduleId, type, contactName, message, status, timestamp, error)
+            SELECT id, scheduleId, type, contactName, message, status, timestamp, error
+            FROM message_logs_broken
+          `);
+
+          // 4. Drop broken table
+          db.exec("DROP TABLE message_logs_broken");
+
+          db.exec("COMMIT");
+          console.log("Repaired message_logs table.");
+        } catch (err) {
+          db.exec("ROLLBACK");
+          console.error("Failed to repair message_logs:", err);
+          // If repair fails, best to drop it so it gets recreated empty rather than leaving it broken
+          db.exec("DROP TABLE IF EXISTS message_logs_broken");
+          db.exec("DROP TABLE IF EXISTS message_logs");
+        }
+      }
+    } catch (e) {
+      console.warn("Error checking for broken FKs:", e);
+    }
+
     // Check if 'paused' status is supported
     try {
       db.exec("BEGIN TRANSACTION");
@@ -68,8 +123,32 @@ export function runMigrations(db: Database.Database) {
             FROM schedules_old
           `);
 
-          // 4. Update foreign keys in message_logs (if necessary, though ON DELETE CASCADE might handle dropping, but we are renaming so ID references should stay valid)
-          // Since we are not changing IDs, references in message_logs remain valid.
+          // 4. Update foreign keys in message_logs
+          // SQLite creates an implicit reference to the renamed table (schedules_old) when renaming.
+          // We MUST recreate message_logs to point to the new 'schedules' table.
+          db.exec("ALTER TABLE message_logs RENAME TO message_logs_old");
+
+          db.exec(`
+            CREATE TABLE IF NOT EXISTS message_logs (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              scheduleId INTEGER,
+              type TEXT NOT NULL CHECK(type IN ('instant', 'once', 'recurring')),
+              contactName TEXT NOT NULL,
+              message TEXT NOT NULL,
+              status TEXT NOT NULL CHECK(status IN ('sending', 'sent', 'failed')),
+              timestamp TEXT DEFAULT CURRENT_TIMESTAMP,
+              error TEXT,
+              FOREIGN KEY (scheduleId) REFERENCES schedules(id) ON DELETE CASCADE
+            );
+          `);
+
+          db.exec(`
+            INSERT INTO message_logs (id, scheduleId, type, contactName, message, status, timestamp, error)
+            SELECT id, scheduleId, type, contactName, message, status, timestamp, error
+            FROM message_logs_old
+          `);
+
+          db.exec("DROP TABLE message_logs_old");
 
           // 5. Drop old table
           db.exec("DROP TABLE schedules_old");
