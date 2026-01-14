@@ -9,7 +9,7 @@ export function runMigrations(db: Database.Database) {
       .all() as any[];
     const hasCron = tableInfo.some((col) => col.name === "cronExpression");
     const hasContactInLogs = activeTableInfo.some(
-      (col) => col.name === "contactName",
+      (col) => col.name === "contactName"
     );
 
     if (hasCron || !hasContactInLogs) {
@@ -28,7 +28,7 @@ export function runMigrations(db: Database.Database) {
     try {
       db.exec("BEGIN TRANSACTION");
       const testStmt = db.prepare(
-        "INSERT INTO schedules (type, contactName, message, status) VALUES ('once', 'test', 'test', 'paused')",
+        "INSERT INTO schedules (type, contactName, message, status) VALUES ('once', 'test', 'test', 'paused')"
       );
       try {
         testStmt.run();
@@ -37,7 +37,7 @@ export function runMigrations(db: Database.Database) {
         db.exec("ROLLBACK");
         if (e.message && e.message.includes("CHECK constraint failed")) {
           console.log(
-            "Detected missing 'paused' status support. Migrating schedules table while PRESERVING data...",
+            "Detected missing 'paused' status support. Migrating schedules table while PRESERVING data..."
           );
 
           // 1. Rename existing table

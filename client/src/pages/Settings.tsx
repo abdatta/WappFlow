@@ -5,7 +5,7 @@ import "./Settings.css";
 
 export function Settings() {
   const [notifPermission, setNotifPermission] = useState(
-    Notification.permission,
+    Notification.permission
   );
   const [tracingEnabled, setTracingEnabled] = useState(false);
 

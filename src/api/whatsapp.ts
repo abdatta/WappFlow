@@ -18,7 +18,7 @@ router.post("/send", async (req, res) => {
   // Create 'sending' log
   const info = db
     .prepare(
-      "INSERT INTO message_logs (type, contactName, message, status) VALUES (?, ?, ?, ?)",
+      "INSERT INTO message_logs (type, contactName, message, status) VALUES (?, ?, ?, ?)"
     )
     .run("instant", contactName, message, "sending");
 
@@ -29,7 +29,7 @@ router.post("/send", async (req, res) => {
 
     // Update to 'sent'
     db.prepare("UPDATE message_logs SET status = 'sent' WHERE id = ?").run(
-      logId,
+      logId
     );
 
     res.json({ success: true, logId });
@@ -38,7 +38,7 @@ router.post("/send", async (req, res) => {
 
     // Update to 'failed'
     db.prepare(
-      "UPDATE message_logs SET status = 'failed', error = ? WHERE id = ?",
+      "UPDATE message_logs SET status = 'failed', error = ? WHERE id = ?"
     ).run(err.message, logId);
 
     res.status(500).json({ success: false, error: err.message });

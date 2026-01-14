@@ -120,7 +120,7 @@ export function HistoryList() {
                       onClick={async () => {
                         try {
                           const response = await fetch(
-                            `/api/history/${log.id}/trace`,
+                            `/api/history/${log.id}/trace`
                           );
                           if (!response.ok) throw new Error("Download failed");
                           const blob = await response.blob();

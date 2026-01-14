@@ -15,7 +15,7 @@ export function ReloadPrompt() {
           () => {
             r.update();
           },
-          60 * 60 * 1000,
+          60 * 60 * 1000
         ); // Check for updates every hour
     },
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

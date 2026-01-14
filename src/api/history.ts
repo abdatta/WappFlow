@@ -9,7 +9,7 @@ router.get("/", (req, res) => {
   try {
     const logs = db
       .prepare(
-        "SELECT id, scheduleId, type, contactName, message, status, error, (CAST(strftime('%s', timestamp) AS INTEGER) * 1000) as timestamp FROM message_logs ORDER BY id DESC",
+        "SELECT id, scheduleId, type, contactName, message, status, error, (CAST(strftime('%s', timestamp) AS INTEGER) * 1000) as timestamp FROM message_logs ORDER BY id DESC"
       )
       .all() as any[];
 

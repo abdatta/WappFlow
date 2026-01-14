@@ -51,7 +51,7 @@ export const api = {
 
   updateScheduleStatus: async (
     id: number,
-    status: "active" | "paused",
+    status: "active" | "paused"
   ): Promise<void> => {
     const res = await fetch(`${API_BASE}/schedules/${id}/status`, {
       method: "PATCH",
@@ -106,7 +106,7 @@ export const api = {
 
   updateFeedback: async (
     id: number,
-    data: { content?: string; isAddressed?: boolean },
+    data: { content?: string; isAddressed?: boolean }
   ): Promise<any> => {
     const res = await fetch(`${API_BASE}/feedbacks/${id}`, {
       method: "PUT",

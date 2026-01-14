@@ -43,7 +43,7 @@ class SchedulerService {
 
     // Find active schedules due for execution
     const stmt = db.prepare(
-      "SELECT * FROM schedules WHERE status = 'active' AND ((type = 'once' AND scheduleTime <= ?) OR (type = 'recurring' AND intervalValue IS NOT NULL AND nextRun <= ?))",
+      "SELECT * FROM schedules WHERE status = 'active' AND ((type = 'once' AND scheduleTime <= ?) OR (type = 'recurring' AND intervalValue IS NOT NULL AND nextRun <= ?))"
     );
 
     const schedules = (stmt.all(nowIso, nowIso) as Schedule[]).filter((s) => {
@@ -67,13 +67,13 @@ class SchedulerService {
 
           if (diffMinutes > s.toleranceMinutes) {
             console.warn(
-              `Schedule ${s.id} skipped. Late by ${diffMinutes.toFixed(1)}m > tolerance ${s.toleranceMinutes}m`,
+              `Schedule ${s.id} skipped. Late by ${diffMinutes.toFixed(1)}m > tolerance ${s.toleranceMinutes}m`
             );
             const logId = this.createHistoryEntry(s, "sending");
             this.updateHistoryEntry(
               logId,
               "failed",
-              `Skipped: Late by ${diffMinutes.toFixed(1)}m`,
+              `Skipped: Late by ${diffMinutes.toFixed(1)}m`
             );
 
             // Update nextRun (updates both DB and in-memory object)
@@ -88,7 +88,7 @@ class SchedulerService {
               // Check if new time is within tolerance
               if (newDiffMinutes < s.toleranceMinutes) {
                 console.log(
-                  `Schedule ${s.id} now qualifies after nextRun update. Executing...`,
+                  `Schedule ${s.id} now qualifies after nextRun update. Executing...`
                 );
                 await this.executeSchedule(s);
               }
@@ -154,7 +154,7 @@ class SchedulerService {
       // This is usually in the future relative to 'now' because of the loop condition
       nextDate = new Date(baseTime);
       nextDate.setMonth(
-        nextDate.getMonth() + (intervalsPassed + 1) * schedule.intervalValue,
+        nextDate.getMonth() + (intervalsPassed + 1) * schedule.intervalValue
       );
 
       // If we just executed and the calculated nextDate is still <= now (unlikely for months but safe to check), bump it
@@ -167,7 +167,7 @@ class SchedulerService {
 
       // Calculate the time at the current interval (which aligns with 'now' or past)
       const currentIntervalTime = new Date(
-        baseTime.getTime() + intervalsPassed * intervalMs,
+        baseTime.getTime() + intervalsPassed * intervalMs
       );
 
       // If current interval time equals now (truncated), it means we are exactly in a slot.
@@ -178,7 +178,7 @@ class SchedulerService {
         if (afterExecution) {
           // We finished this slot, move to next
           nextDate = new Date(
-            baseTime.getTime() + (intervalsPassed + 1) * intervalMs,
+            baseTime.getTime() + (intervalsPassed + 1) * intervalMs
           );
         } else {
           // We are calculating potentially for catch-up, so this slot is valid
@@ -187,7 +187,7 @@ class SchedulerService {
       } else {
         // Next run is naturally the next one
         nextDate = new Date(
-          baseTime.getTime() + (intervalsPassed + 1) * intervalMs,
+          baseTime.getTime() + (intervalsPassed + 1) * intervalMs
         );
       }
     }
@@ -196,7 +196,7 @@ class SchedulerService {
 
     db.prepare("UPDATE schedules SET nextRun = ? WHERE id = ?").run(
       nextRunIso,
-      schedule.id,
+      schedule.id
     );
 
     // Update in-memory object to keep it in sync
@@ -209,7 +209,7 @@ class SchedulerService {
 
   async executeSchedule(schedule: Schedule, isRetry: boolean = false) {
     console.log(
-      `Executing schedule ${schedule.id}${isRetry ? " (retry)" : ""}...`,
+      `Executing schedule ${schedule.id}${isRetry ? " (retry)" : ""}...`
     );
 
     // Mark as running
@@ -222,19 +222,19 @@ class SchedulerService {
       await whatsappService.sendMessage(
         schedule.contactName,
         schedule.message,
-        logId,
+        logId
       );
 
       // Update stats
       const now = new Date().toISOString();
       if (schedule.type === "once") {
         db.prepare(
-          "UPDATE schedules SET status = 'completed', lastRun = ? WHERE id = ?",
+          "UPDATE schedules SET status = 'completed', lastRun = ? WHERE id = ?"
         ).run(now, schedule.id);
       } else {
         db.prepare("UPDATE schedules SET lastRun = ? WHERE id = ?").run(
           now,
-          schedule.id,
+          schedule.id
         );
         // Calculate next run for interval schedules
         if (schedule.intervalValue) {
@@ -256,7 +256,7 @@ class SchedulerService {
       // Handle failure
       if (schedule.type === "once") {
         db.prepare("UPDATE schedules SET status = 'failed' WHERE id = ?").run(
-          schedule.id,
+          schedule.id
         );
       } else if (schedule.type === "recurring" && schedule.intervalValue) {
         // For recurring tasks, update nextRun even on failure
@@ -273,18 +273,18 @@ class SchedulerService {
 
   private createHistoryEntry(
     schedule: Schedule,
-    status: "sending" | "sent" | "failed",
+    status: "sending" | "sent" | "failed"
   ): number | bigint {
     const info = db
       .prepare(
-        "INSERT INTO message_logs (scheduleId, type, contactName, message, status) VALUES (?, ?, ?, ?, ?)",
+        "INSERT INTO message_logs (scheduleId, type, contactName, message, status) VALUES (?, ?, ?, ?, ?)"
       )
       .run(
         schedule.id,
         schedule.type,
         schedule.contactName,
         schedule.message,
-        status,
+        status
       );
     return info.lastInsertRowid;
   }
@@ -292,10 +292,10 @@ class SchedulerService {
   private updateHistoryEntry(
     logId: number | bigint,
     status: "sent" | "failed",
-    error?: string,
+    error?: string
   ) {
     db.prepare(
-      "UPDATE message_logs SET status = ?, error = ? WHERE id = ?",
+      "UPDATE message_logs SET status = ?, error = ? WHERE id = ?"
     ).run(status, error || null, logId);
   }
 }

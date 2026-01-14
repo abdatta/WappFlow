@@ -121,8 +121,8 @@ export function Feedbacks() {
       const update = () => {
         setFeedbacks((prev) =>
           sortFeedbacks(
-            prev.map((f) => (f.id === feedback.id ? updatedFeedback : f)),
-          ),
+            prev.map((f) => (f.id === feedback.id ? updatedFeedback : f))
+          )
         );
       };
 

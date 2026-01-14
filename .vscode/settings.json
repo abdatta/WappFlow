@@ -1,8 +1,6 @@
 {
   "editor.formatOnSave": true,
-  "editor.codeActionsOnSave": {
-    "source.organizeImports": "explicit"
-  },
+  "editor.codeActionsOnSave": {},
   "editor.defaultFormatter": "esbenp.prettier-vscode",
   "[markdown]": {
     "editor.defaultFormatter": "esbenp.prettier-vscode",

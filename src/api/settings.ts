@@ -34,7 +34,7 @@ router.put("/:key", (req, res) => {
     }
 
     db.prepare(
-      "INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+      "INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value"
     ).run(key, String(value));
 
     res.json({ success: true, key, value });

@@ -29,18 +29,18 @@ class NotificationService {
 
       db.prepare("INSERT INTO settings (key, value) VALUES (?, ?)").run(
         "vapid_public_key",
-        this.publicKey,
+        this.publicKey
       );
       db.prepare("INSERT INTO settings (key, value) VALUES (?, ?)").run(
         "vapid_private_key",
-        this.privateKey,
+        this.privateKey
       );
     }
 
     webpush.setVapidDetails(
       "mailto:example@yourdomain.org",
       this.publicKey!,
-      this.privateKey!,
+      this.privateKey!
     );
   }
 
@@ -52,7 +52,7 @@ class NotificationService {
     const keys = JSON.stringify(subscription.keys);
     try {
       db.prepare(
-        "INSERT INTO subscriptions (endpoint, expirationTime, keys) VALUES (?, ?, ?)",
+        "INSERT INTO subscriptions (endpoint, expirationTime, keys) VALUES (?, ?, ?)"
       ).run(subscription.endpoint, subscription.expirationTime, keys);
     } catch (e) {
       // Ignore unique constraint error (already subscribed)
@@ -77,7 +77,7 @@ class NotificationService {
         if (err.statusCode === 410 || err.statusCode === 404) {
           // Subscription expired/gone
           db.prepare("DELETE FROM subscriptions WHERE endpoint = ?").run(
-            sub.endpoint,
+            sub.endpoint
           );
         } else {
           console.error("Error sending notification:", err);

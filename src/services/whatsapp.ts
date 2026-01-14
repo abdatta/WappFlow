@@ -79,7 +79,7 @@ export class WhatsAppService {
       const isAuthenticated = await this.isLoggedIn();
       this.saveStatus(isAuthenticated);
       console.log(
-        `WhatsApp status: ${isAuthenticated ? "Authenticated" : "Disconnected"}`,
+        `WhatsApp status: ${isAuthenticated ? "Authenticated" : "Disconnected"}`
       );
       await this.closeBrowser();
       return isAuthenticated;
@@ -115,7 +115,7 @@ export class WhatsAppService {
           "--no-sandbox",
           "--disable-setuid-sandbox",
         ],
-      },
+      }
     );
 
     this.page =
@@ -215,7 +215,7 @@ export class WhatsAppService {
     onQR: QRCallback,
     onAuth: AuthCallback,
     onError: ErrorCallback,
-    onStream: StreamCallback,
+    onStream: StreamCallback
   ) {
     console.log(`Starting connection monitoring for ${connectionId}`);
     this.activeConnections.set(connectionId, {
@@ -320,7 +320,7 @@ export class WhatsAppService {
       const qr = await this.getQRCode();
       if (qr) {
         console.log(
-          `QR code captured, broadcasting to ${this.activeConnections.size} connections`,
+          `QR code captured, broadcasting to ${this.activeConnections.size} connections`
         );
         for (const [id, callbacks] of this.activeConnections) {
           callbacks.onQR(qr);
@@ -380,7 +380,7 @@ export class WhatsAppService {
   async sendMessage(
     contactName: string,
     message: string,
-    logId?: number | bigint,
+    logId?: number | bigint
   ): Promise<void> {
     console.log(`Attempting to send message to contact: ${contactName}`);
 
@@ -464,11 +464,11 @@ export class WhatsAppService {
             return label && label.trim() !== "Pending";
           },
           null, // No arguments passed
-          { timeout: 30000 },
+          { timeout: 30000 }
         )
         .catch((err) => {
           throw new Error(
-            `Message status verification timed out: ${err.message}. This likely means the message remained 'Pending' or wasn't found.`,
+            `Message status verification timed out: ${err.message}. This likely means the message remained 'Pending' or wasn't found.`
           );
         });
 

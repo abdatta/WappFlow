@@ -63,7 +63,7 @@ export function Schedules() {
     const inputDate = new Date(
       date.getFullYear(),
       date.getMonth(),
-      date.getDate(),
+      date.getDate()
     );
 
     const diffTime = inputDate.getTime() - today.getTime();
@@ -154,7 +154,7 @@ export function Schedules() {
                     (s.type === "once" &&
                       (s.status === "pending" ||
                         s.status === "active" ||
-                        s.status === "paused")),
+                        s.status === "paused"))
                 )
                 .map((s) => (
                   <ScheduleCard
@@ -172,7 +172,7 @@ export function Schedules() {
                   (s.type === "once" &&
                     (s.status === "pending" ||
                       s.status === "active" ||
-                      s.status === "paused")),
+                      s.status === "paused"))
               ).length === 0 && (
                 <p class="section-empty">No active schedules</p>
               )}

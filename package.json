@@ -14,6 +14,9 @@
     "build:client": "npm run build --workspace=client",
     "build:server": "tsc -p tsconfig.json",
     "start": "node dist/src/server.js",
+    "lint": "concurrently \"prettier --check .\" \"npm run typecheck:server\" \"npm run typecheck:client\"",
+    "typecheck:server": "tsc --noEmit",
+    "typecheck:client": "tsc --noEmit -p client",
     "format": "prettier --write .",
     "prepare": "husky",
     "lint-staged": "lint-staged"
@@ -37,6 +40,7 @@
     "husky": "^9.1.7",
     "lint-staged": "^15.2.11",
     "prettier": "^3.4.2",
+    "prettier-plugin-organize-imports": "^4.3.0",
     "tsx": "^4.19.2",
     "typescript": "^5.7.2"
   },

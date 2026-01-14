@@ -97,7 +97,7 @@ wss.on("connection", (ws) => {
     (image) => {
       // Send stream image to client
       ws.send(JSON.stringify({ type: "stream", image }));
-    },
+    }
   );
 
   ws.on("close", () => {
