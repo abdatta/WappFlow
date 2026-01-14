@@ -17,8 +17,24 @@ export function CreateSchedule() {
   >("day");
   const [startDateTime, setStartDateTime] = useState("");
   const [tolerance, setTolerance] = useState("");
-
   const [submitting, setSubmitting] = useState(false);
+  // Suggestions logic
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+
+  // Fetch suggestions on mount
+  useState(() => {
+    api.getContactSuggestions().then(setSuggestions).catch(console.error);
+  });
+
+  const filteredSuggestions = suggestions.filter((s) =>
+    s.toLowerCase().includes(contactName.toLowerCase())
+  );
+
+  const handleSelectSuggestion = (name: string) => {
+    setContactName(name);
+    setShowSuggestions(false);
+  };
 
   const handleSubmit = async (e: Event) => {
     e.preventDefault();
@@ -75,9 +91,35 @@ export function CreateSchedule() {
             type="text"
             placeholder="John Doe"
             value={contactName}
-            onInput={(e: any) => setContactName(e.target.value)}
+            onInput={(e: any) => {
+              setContactName(e.target.value);
+              setShowSuggestions(true);
+            }}
+            onFocus={() => setShowSuggestions(true)}
+            onBlur={() => {
+              // Delay hide to allow click to register
+              setTimeout(() => setShowSuggestions(false), 200);
+            }}
             required
+            autocomplete="off"
           />
+          {showSuggestions && contactName && filteredSuggestions.length > 0 && (
+            <ul class="suggestions-dropdown">
+              {filteredSuggestions.map((name) => (
+                <li
+                  key={name}
+                  onClick={() => handleSelectSuggestion(name)}
+                  // onMouseDown ensures this fires before onBlur
+                  onMouseDown={(e) => {
+                    e.preventDefault(); // Prevent blur
+                    handleSelectSuggestion(name);
+                  }}
+                >
+                  {name}
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
 
         <div class="form-group">

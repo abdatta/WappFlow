@@ -10,6 +10,15 @@ export const api = {
     return res.json();
   },
 
+  getContactSuggestions: async (): Promise<string[]> => {
+    const res = await fetch(`${API_BASE}/history/suggestions`);
+    if (!res.ok) {
+      console.warn("Failed to fetch suggestions");
+      return [];
+    }
+    return res.json();
+  },
+
   // Schedules
   getSchedules: async (): Promise<Schedule[]> => {
     const res = await fetch(`${API_BASE}/schedules`);

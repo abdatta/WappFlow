@@ -29,6 +29,23 @@ router.get("/", (req, res) => {
   }
 });
 
+router.get("/suggestions", (req, res) => {
+  try {
+    const contacts = db
+      .prepare(
+        "SELECT DISTINCT contactName FROM message_logs WHERE status = 'sent' ORDER BY contactName ASC"
+      )
+      .all() as { contactName: string }[];
+
+    // Return simple array of strings
+    res.json(contacts.map((c) => c.contactName));
+  } catch (err: any) {
+    console.error("Failed to fetch suggestions:", err);
+    // Return empty array on error instead of failing, to not break UI
+    res.json([]);
+  }
+});
+
 router.get("/:id/trace", (req, res) => {
   const { id } = req.params;
   const tracePath = path.resolve(`data/traces/trace_${id}.zip`);
