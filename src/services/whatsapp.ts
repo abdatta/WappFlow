@@ -121,6 +121,10 @@ export class WhatsAppService {
     this.page =
       this.browserContext.pages()[0] || (await this.browserContext.newPage());
 
+    this.page.on("console", (msg) => {
+      console.log(`[Browser] ${msg.type().toUpperCase()}: ${msg.text()}`);
+    });
+
     // Hide webdriver property and other automation indicators
     await this.page.addInitScript(() => {
       // Override navigator.webdriver
@@ -453,15 +457,29 @@ export class WhatsAppService {
           () => {
             const allMessages = document.querySelectorAll(".message-out");
             const lastMessage = allMessages[allMessages.length - 1];
-            if (!lastMessage) return false;
+            if (!lastMessage) {
+              console.log("[WaitForFunction] No .message-out elements found");
+              return false;
+            }
 
             const svg = lastMessage.querySelector("svg");
+            if (!svg) {
+              console.log(
+                "[WaitForFunction] SVG element not found in last message"
+              );
+            }
             // The status icon container is the parent of the SVG
             const statusContainer = svg?.parentElement;
 
-            if (!statusContainer) return false;
+            if (!statusContainer) {
+              console.log(
+                "[WaitForFunction] Status container (SVG parent) not found in last message"
+              );
+              return false;
+            }
 
             const label = statusContainer.getAttribute("aria-label");
+            console.log(`[WaitForFunction] Current status label: '${label}'`);
             return label && label.trim() !== "Pending";
           },
           null, // No arguments passed
