@@ -107,6 +107,7 @@ export class WhatsAppService {
       USER_DATA_DIR,
       {
         headless: true,
+        permissions: ["clipboard-read", "clipboard-write"],
         viewport: null,
         userAgent:
           "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
@@ -403,6 +404,37 @@ export class WhatsAppService {
     }
   }
 
+  async openChatUnsaved(contactNo: string): Promise<void> {
+    if (!this.page) throw new Error("Page not initialized");
+
+    console.log(`Opening unsaved chat: ${contactNo}`);
+    const newChatBtnSelector = 'button[aria-label="New chat"]';
+    const searchInputSelector = 'div[aria-label="Search name or number"]';
+    const composerSelector = "div[contenteditable='true'][data-tab]";
+
+    try {
+      await this.page.waitForSelector(newChatBtnSelector, { timeout: 10000 });
+      await this.page.click(newChatBtnSelector);
+
+      await this.page.waitForSelector(searchInputSelector, { timeout: 10000 });
+
+      await this.page.click(searchInputSelector);
+      await delay(500);
+      await this.page.keyboard.type(contactNo);
+
+      await delay(2000);
+
+      // Press Enter to select the first result (contact)
+      await this.page.keyboard.press("Enter");
+
+      await this.page.waitForSelector(composerSelector, { timeout: 20000 });
+      console.log(`Unsaved chat opened: ${contactNo}`);
+    } catch (err) {
+      console.error(`Failed to open unsaved chat '${contactNo}':`, err);
+      throw err;
+    }
+  }
+
   private async waitUntilTargetSecond(): Promise<void> {
     // Check if configuration is valid (0-59)
     if (BROWSER_CLOSE_TARGET_SECOND < 0 || BROWSER_CLOSE_TARGET_SECOND > 59) {
@@ -499,11 +531,23 @@ export class WhatsAppService {
       // Type and send the message
       await delay(400 + Math.random() * 800);
       // Clear any existing text first
-      await this.page.keyboard.press("Control+A");
+      // Clear any existing text first
+      const isMac = process.platform === "darwin";
+      const modifier = isMac ? "Meta" : "Control";
+
+      await this.page.keyboard.press(`${modifier}+A`);
       await this.page.keyboard.press("Backspace");
       await delay(200);
 
-      await this.page.keyboard.type(message);
+      // Copy to clipboard and paste to preserve formatting and prevent newlines from sending
+      await this.page.evaluate(async (text) => {
+        await navigator.clipboard.writeText(text);
+      }, message);
+      await delay(200);
+
+      await this.page.keyboard.press(`${modifier}+V`);
+      await delay(500); // Wait for paste to complete
+
       await this.page.keyboard.press("Enter");
       await delay(2000);
 
@@ -586,6 +630,139 @@ export class WhatsAppService {
       // If it fails, it's technically "done with its stuff".
       // I'll add it to the error path as well for consistency, unless user complains.
 
+      await this.closeBrowser();
+      throw err;
+    }
+  }
+
+  async sendMessageUnsaved(
+    contactNo: string,
+    message: string,
+    logId?: number | bigint
+  ): Promise<void> {
+    console.log(`Attempting to send message to unsaved contact: ${contactNo}`);
+
+    // Check if tracing is enabled
+    let tracingEnabled = false;
+    try {
+      const setting = db
+        .prepare("SELECT value FROM settings WHERE key = 'enable_tracing'")
+        .get() as { value: string } | undefined;
+      tracingEnabled = setting?.value === "true";
+    } catch (err) {
+      console.error("Failed to check tracing setting:", err);
+    }
+
+    try {
+      await this.openBrowser();
+
+      // Check if still logged in
+      const isAuth = await this.isLoggedIn();
+      if (!isAuth) {
+        console.error("Not authenticated - QR code detected");
+        this.saveStatus(false);
+        await this.closeBrowser();
+        throw new Error("WhatsApp session expired - please reconnect");
+      }
+
+      if (!this.page) throw new Error("Driver not initialized");
+      await this.ensureReady();
+
+      // Open the target chat
+      await this.openChatUnsaved(contactNo);
+
+      // Start tracing if enabled and context is available
+      if (tracingEnabled && this.browserContext) {
+        console.log(`Starting trace for logId: ${logId}`);
+        await this.browserContext.tracing.start({
+          screenshots: true,
+          snapshots: true,
+          sources: true,
+        });
+      }
+
+      // Type and send the message
+      await delay(400 + Math.random() * 800);
+      // Clear any existing text first
+      // Clear any existing text first
+      const isMac = process.platform === "darwin";
+      const modifier = isMac ? "Meta" : "Control";
+
+      await this.page.keyboard.press(`${modifier}+A`);
+      await this.page.keyboard.press("Backspace");
+      await delay(200);
+
+      // Copy to clipboard and paste to preserve formatting and prevent newlines from sending
+      await this.page.evaluate(async (text) => {
+        await navigator.clipboard.writeText(text);
+      }, message);
+      await delay(200);
+
+      await this.page.keyboard.press(`${modifier}+V`);
+      await delay(500); // Wait for paste to complete
+
+      await this.page.keyboard.press("Enter");
+      await delay(2000);
+
+      // Wait for message to be sent (status != 'Pending')
+      console.log("Waiting for message status to update from Pending...");
+      await this.page
+        .waitForFunction(
+          () => {
+            const allMessages = document.querySelectorAll(".message-out");
+            const lastMessage = allMessages[allMessages.length - 1];
+            if (!lastMessage) {
+              console.log("[WaitForFunction] No .message-out elements found");
+              return false;
+            }
+
+            const svg = lastMessage.querySelector("svg");
+            // The status icon container is the parent of the SVG
+            const statusContainer = svg?.parentElement;
+
+            if (!statusContainer) {
+              return false;
+            }
+
+            const label = statusContainer.getAttribute("aria-label");
+            return label && label.trim() !== "Pending";
+          },
+          null, // No arguments passed
+          { timeout: 20000 }
+        )
+        .catch((err) => {
+          throw new Error(
+            `Message status verification timed out: ${err.message}. This likely means the message remained 'Pending' or wasn't found.`
+          );
+        });
+
+      // Return to default chat instead of chat list
+      await this.returnToDefaultChat();
+
+      console.log("Message sent successfully to unsaved contact");
+
+      if (tracingEnabled && this.browserContext && logId) {
+        const tracePath = path.join(TRACES_DIR, `trace_${logId}.zip`);
+        await this.browserContext.tracing.stop({ path: tracePath });
+        console.log(`Trace saved to: ${tracePath}`);
+      }
+
+      await this.waitUntilTargetSecond();
+      await this.closeBrowser();
+    } catch (err: any) {
+      console.error("Failed to send message to unsaved contact:", err);
+
+      if (tracingEnabled && this.browserContext && logId) {
+        try {
+          const tracePath = path.join(TRACES_DIR, `trace_${logId}.zip`);
+          await this.browserContext.tracing.stop({ path: tracePath });
+          console.log(`Trace saved to: ${tracePath} (after failure)`);
+        } catch (traceErr) {
+          console.error("Failed to save trace after error:", traceErr);
+        }
+      }
+
+      await this.waitUntilTargetSecond();
       await this.closeBrowser();
       throw err;
     }

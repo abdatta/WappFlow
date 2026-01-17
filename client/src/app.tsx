@@ -4,6 +4,8 @@ import { Layout } from "./components/Layout";
 import { ReloadPrompt } from "./components/ReloadPrompt";
 import { ConnectWhatsApp } from "./pages/ConnectWhatsApp";
 import { CreateSchedule } from "./pages/CreateSchedule";
+import { Contacts } from "./pages/Contacts";
+import { Broadcasts } from "./pages/Broadcasts";
 import { Feedbacks } from "./pages/Feedbacks";
 import { Schedules } from "./pages/Schedules";
 import { Settings } from "./pages/Settings";
@@ -50,6 +52,8 @@ export function App() {
       <Switch>
         <Route path="/" component={Schedules} />
         <Route path="/create" component={CreateSchedule} />
+        <Route path="/contacts" component={Contacts} />
+        <Route path="/broadcasts" component={Broadcasts} />
         <Route path="/feedbacks" component={Feedbacks} />
         <Route path="/settings" component={Settings} />
         <Route>

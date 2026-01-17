@@ -39,6 +39,12 @@ app.use("/api/whatsapp", whatsappRouter);
 import notificationsRouter from "./api/notifications.js";
 app.use("/api/notifications", notificationsRouter);
 
+import contactsRouter from "./api/contacts.js";
+app.use("/api/contacts", contactsRouter);
+
+import broadcastsRouter from "./api/broadcasts.js";
+app.use("/api/broadcasts", broadcastsRouter);
+
 import historyRouter from "./api/history.js";
 app.use("/api/history", historyRouter);
 
