@@ -1,5 +1,5 @@
 import cron from "node-cron";
-import { Schedule } from "../../shared/types.js";
+import { Broadcast, Contact, Schedule } from "../../shared/types.js";
 import db from "../db/db.js";
 import { whatsappService } from "./whatsapp.js";
 
@@ -14,6 +14,7 @@ class SchedulerService {
     // Check schedules every minute (heartbeat)
     cron.schedule("* * * * *", () => {
       this.checkSchedules();
+      this.checkBroadcasts();
     });
   }
 
@@ -271,6 +272,8 @@ class SchedulerService {
       await whatsappService.sendMessage(
         schedule.contactName,
         schedule.message,
+        undefined, // attachmentPath
+        undefined, // attachmentName
         logId
       );
 
@@ -346,6 +349,97 @@ class SchedulerService {
     db.prepare(
       "UPDATE message_logs SET status = ?, error = ? WHERE id = ?"
     ).run(status, error || null, logId);
+  }
+
+  async checkBroadcasts() {
+    const status = whatsappService.getStatus();
+    if (!status.authenticated) return;
+
+    const now = new Date();
+    const nowIso = now.toISOString();
+
+    // Find active broadcasts due for execution
+    const broadcasts = db
+      .prepare(
+        "SELECT * FROM broadcasts WHERE status = 'scheduled' AND ((type = 'once' AND scheduledTime <= ?) OR (type = 'recurring' AND nextRun <= ?))"
+      )
+      .all(nowIso, nowIso) as Broadcast[];
+
+    for (const b of broadcasts) {
+      console.log(`Processing scheduled broadcast ${b.id}: ${b.name}`);
+
+      // Update status to processing to prevent double execution
+      db.prepare(
+        "UPDATE broadcasts SET status = 'processing' WHERE id = ?"
+      ).run(b.id);
+
+      const recipients = db
+        .prepare(
+          `
+        SELECT c.* FROM broadcast_recipients br
+        JOIN contacts c ON br.contactId = c.id
+        WHERE br.broadcastId = ? AND br.status = 'pending'
+      `
+        )
+        .all(b.id) as Contact[];
+
+      (async () => {
+        for (const contact of recipients) {
+          try {
+            await whatsappService.sendMessageUnsaved(
+              contact.number,
+              b.message,
+              b.attachmentPath || undefined,
+              b.attachmentName || undefined
+            );
+            db.prepare(
+              "UPDATE broadcast_recipients SET status = 'sent', sentAt = CURRENT_TIMESTAMP WHERE broadcastId = ? AND contactId = ?"
+            ).run(b.id, contact.id);
+          } catch (err: any) {
+            console.error(
+              `Failed to send broadcast ${b.id} to ${contact.number}:`,
+              err
+            );
+            db.prepare(
+              "UPDATE broadcast_recipients SET status = 'failed', error = ? WHERE broadcastId = ? AND contactId = ?"
+            ).run(err.message, b.id, contact.id);
+          }
+        }
+
+        // Update broadcast status and handle recurrence
+        const updatedStatus =
+          b.type === "recurring" ? "scheduled" : "completed";
+        const lastRun = new Date().toISOString();
+        let nextRun = null;
+
+        if (b.type === "recurring" && b.intervalValue && b.intervalUnit) {
+          // Calculate next run
+          const nextDate = new Date();
+          switch (b.intervalUnit) {
+            case "minute":
+              nextDate.setMinutes(nextDate.getMinutes() + b.intervalValue);
+              break;
+            case "hour":
+              nextDate.setHours(nextDate.getHours() + b.intervalValue);
+              break;
+            case "day":
+              nextDate.setDate(nextDate.getDate() + b.intervalValue);
+              break;
+            case "week":
+              nextDate.setDate(nextDate.getDate() + b.intervalValue * 7);
+              break;
+            case "month":
+              nextDate.setMonth(nextDate.getMonth() + b.intervalValue);
+              break;
+          }
+          nextRun = nextDate.toISOString();
+        }
+
+        db.prepare(
+          "UPDATE broadcasts SET status = ?, lastRun = ?, nextRun = ? WHERE id = ?"
+        ).run(updatedStatus, lastRun, nextRun, b.id);
+      })();
+    }
   }
 }
 

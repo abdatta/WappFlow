@@ -107,6 +107,7 @@ export class WhatsAppService {
       USER_DATA_DIR,
       {
         headless: true,
+        permissions: ["clipboard-read", "clipboard-write"],
         viewport: null,
         userAgent:
           "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
@@ -403,6 +404,37 @@ export class WhatsAppService {
     }
   }
 
+  async openChatUnsaved(contactNo: string): Promise<void> {
+    if (!this.page) throw new Error("Page not initialized");
+
+    console.log(`Opening unsaved chat: ${contactNo}`);
+    const newChatBtnSelector = 'button[aria-label="New chat"]';
+    const searchInputSelector = 'div[aria-label="Search name or number"]';
+    const composerSelector = "div[contenteditable='true'][data-tab]";
+
+    try {
+      await this.page.waitForSelector(newChatBtnSelector, { timeout: 1000 });
+      await this.page.click(newChatBtnSelector);
+
+      await this.page.waitForSelector(searchInputSelector, { timeout: 1000 });
+
+      await this.page.click(searchInputSelector);
+      await delay(500);
+      await this.page.keyboard.type(contactNo);
+
+      // Click the search result instead of pressing Enter
+      const contactSelector = 'div[data-tab="4"][role="button"]';
+      await this.page.waitForSelector(contactSelector, { timeout: 2000 });
+      await this.page.click(contactSelector);
+
+      await this.page.waitForSelector(composerSelector, { timeout: 20000 });
+      console.log(`Unsaved chat opened: ${contactNo}`);
+    } catch (err) {
+      console.error(`Failed to open unsaved chat '${contactNo}':`, err);
+      throw err;
+    }
+  }
+
   private async waitUntilTargetSecond(): Promise<void> {
     // Check if configuration is valid (0-59)
     if (BROWSER_CLOSE_TARGET_SECOND < 0 || BROWSER_CLOSE_TARGET_SECOND > 59) {
@@ -453,6 +485,8 @@ export class WhatsAppService {
   async sendMessage(
     contactName: string,
     message: string,
+    attachmentPath?: string,
+    attachmentName?: string,
     logId?: number | bigint
   ): Promise<void> {
     console.log(`Attempting to send message to contact: ${contactName}`);
@@ -499,13 +533,73 @@ export class WhatsAppService {
       // Type and send the message
       await delay(400 + Math.random() * 800);
       // Clear any existing text first
-      await this.page.keyboard.press("Control+A");
+      // Clear any existing text first
+      const isMac = process.platform === "darwin";
+      const modifier = isMac ? "Meta" : "Control";
+
+      await this.page.keyboard.press(`${modifier}+A`);
       await this.page.keyboard.press("Backspace");
       await delay(200);
 
-      await this.page.keyboard.type(message);
-      await this.page.keyboard.press("Enter");
-      await delay(2000);
+      // Copy to clipboard and paste to preserve formatting and prevent newlines from sending
+      await this.page.evaluate(async (text) => {
+        await navigator.clipboard.writeText(text);
+      }, message);
+      await delay(200);
+
+      await this.page.keyboard.press(`${modifier}+V`);
+      await delay(500); // Wait for paste to complete
+
+      if (attachmentPath) {
+        console.log(
+          `Attaching file: ${attachmentPath}${attachmentName ? ` as ${attachmentName}` : ""}`
+        );
+        const fileBuffer = fs.readFileSync(attachmentPath);
+        const fileName = attachmentName || path.basename(attachmentPath);
+        const extension = path.extname(fileName).toLowerCase();
+
+        // Simple mime type map
+        const mimeTypes: { [key: string]: string } = {
+          ".png": "image/png",
+          ".jpg": "image/jpeg",
+          ".jpeg": "image/jpeg",
+          ".gif": "image/gif",
+          ".pdf": "application/pdf",
+          ".mp4": "video/mp4",
+          ".mp3": "audio/mpeg",
+          ".csv": "text/csv",
+          ".txt": "text/plain",
+          ".docx":
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+          ".xlsx":
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        };
+        const mimeType = mimeTypes[extension] || "application/octet-stream";
+
+        await this.page.evaluate(
+          async ({ buffer, name, type }) => {
+            const blob = new Blob([new Uint8Array(buffer)], { type });
+            const file = new File([blob], name, { type });
+            const dataTransfer = new DataTransfer();
+            dataTransfer.items.add(file);
+            const event = new ClipboardEvent("paste", {
+              clipboardData: dataTransfer,
+              bubbles: true,
+              cancelable: true,
+            });
+            document.activeElement?.dispatchEvent(event);
+          },
+          { buffer: Array.from(fileBuffer), name: fileName, type: mimeType }
+        );
+
+        console.log("Waiting for attachment to load...");
+        await delay(3000); // Wait for attachment to process
+        await this.page.keyboard.press("Enter");
+        await delay(2000);
+      } else {
+        await this.page.keyboard.press("Enter");
+        await delay(2000);
+      }
 
       // Wait for message to be sent (status != 'Pending')
       // Using locator API as requested: verify last message's status icon
@@ -577,14 +671,190 @@ export class WhatsAppService {
         }
       }
 
-      await this.waitUntilTargetSecond(); // Wait before closing on error too? Usually safer to keep pattern consistent or fail fast.
-      // Requirement: "from the moment a task starts... it should remain open untill thr 55th second... It can exceed that if need be"
-      // So yes, even on error we should hypothetically wait, but often errors need fast feedback.
-      // However, "fail fast" usually wins. But let's stick to valid "task starts... keep browser open".
-      // Let's apply it to success path first and foremost. For error, maybe better to close fast?
-      // Re-reading: "make sure that from the moment a task starts... it is done with its stuff before that it should still keep the browser open"
-      // If it fails, it's technically "done with its stuff".
-      // I'll add it to the error path as well for consistency, unless user complains.
+      // Skip wait on error
+
+      // Close browser immediately on failure
+
+      await this.closeBrowser();
+      throw err;
+    }
+  }
+
+  async sendMessageUnsaved(
+    contactNo: string,
+    message: string,
+    attachmentPath?: string,
+    attachmentName?: string,
+    logId?: number | bigint
+  ): Promise<void> {
+    console.log(`Attempting to send message to unsaved contact: ${contactNo}`);
+
+    // Check if tracing is enabled
+    let tracingEnabled = false;
+    try {
+      const setting = db
+        .prepare("SELECT value FROM settings WHERE key = 'enable_tracing'")
+        .get() as { value: string } | undefined;
+      tracingEnabled = setting?.value === "true";
+    } catch (err) {
+      console.error("Failed to check tracing setting:", err);
+    }
+
+    try {
+      await this.openBrowser();
+
+      // Check if still logged in
+      const isAuth = await this.isLoggedIn();
+      if (!isAuth) {
+        console.error("Not authenticated - QR code detected");
+        this.saveStatus(false);
+        await this.closeBrowser();
+        throw new Error("WhatsApp session expired - please reconnect");
+      }
+
+      if (!this.page) throw new Error("Driver not initialized");
+      await this.ensureReady();
+
+      // Open the target chat
+      await this.openChatUnsaved(contactNo);
+
+      // Start tracing if enabled and context is available
+      if (tracingEnabled && this.browserContext) {
+        console.log(`Starting trace for logId: ${logId}`);
+        await this.browserContext.tracing.start({
+          screenshots: true,
+          snapshots: true,
+          sources: true,
+        });
+      }
+
+      // Type and send the message
+      await delay(400 + Math.random() * 800);
+      // Clear any existing text first
+      // Clear any existing text first
+      const isMac = process.platform === "darwin";
+      const modifier = isMac ? "Meta" : "Control";
+
+      await this.page.keyboard.press(`${modifier}+A`);
+      await this.page.keyboard.press("Backspace");
+      await delay(200);
+
+      // Copy to clipboard and paste to preserve formatting and prevent newlines from sending
+      await this.page.evaluate(async (text) => {
+        await navigator.clipboard.writeText(text);
+      }, message);
+      await delay(200);
+
+      await this.page.keyboard.press(`${modifier}+V`);
+      await delay(500); // Wait for paste to complete
+
+      if (attachmentPath) {
+        console.log(
+          `Attaching file: ${attachmentPath}${attachmentName ? ` as ${attachmentName}` : ""}`
+        );
+        const fileBuffer = fs.readFileSync(attachmentPath);
+        const fileName = attachmentName || path.basename(attachmentPath);
+        const extension = path.extname(fileName).toLowerCase();
+
+        const mimeTypes: { [key: string]: string } = {
+          ".png": "image/png",
+          ".jpg": "image/jpeg",
+          ".jpeg": "image/jpeg",
+          ".gif": "image/gif",
+          ".pdf": "application/pdf",
+          ".mp4": "video/mp4",
+          ".mp3": "audio/mpeg",
+          ".csv": "text/csv",
+          ".txt": "text/plain",
+          ".docx":
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+          ".xlsx":
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        };
+        const mimeType = mimeTypes[extension] || "application/octet-stream";
+
+        await this.page.evaluate(
+          async ({ buffer, name, type }) => {
+            const blob = new Blob([new Uint8Array(buffer)], { type });
+            const file = new File([blob], name, { type });
+            const dataTransfer = new DataTransfer();
+            dataTransfer.items.add(file);
+            const event = new ClipboardEvent("paste", {
+              clipboardData: dataTransfer,
+              bubbles: true,
+              cancelable: true,
+            });
+            document.activeElement?.dispatchEvent(event);
+          },
+          { buffer: Array.from(fileBuffer), name: fileName, type: mimeType }
+        );
+
+        console.log("Waiting for attachment to load...");
+        await delay(3000); // Wait for attachment to process
+        await this.page.keyboard.press("Enter");
+        await delay(2000);
+      } else {
+        await this.page.keyboard.press("Enter");
+        await delay(2000);
+      }
+
+      // Wait for message to be sent (status != 'Pending')
+      console.log("Waiting for message status to update from Pending...");
+      await this.page
+        .waitForFunction(
+          () => {
+            const allMessages = document.querySelectorAll(".message-out");
+            const lastMessage = allMessages[allMessages.length - 1];
+            if (!lastMessage) {
+              console.log("[WaitForFunction] No .message-out elements found");
+              return false;
+            }
+
+            const svg = lastMessage.querySelector("svg");
+            // The status icon container is the parent of the SVG
+            const statusContainer = svg?.parentElement;
+
+            if (!statusContainer) {
+              return false;
+            }
+
+            const label = statusContainer.getAttribute("aria-label");
+            return label && label.trim() !== "Pending";
+          },
+          null, // No arguments passed
+          { timeout: 20000 }
+        )
+        .catch((err) => {
+          throw new Error(
+            `Message status verification timed out: ${err.message}. This likely means the message remained 'Pending' or wasn't found.`
+          );
+        });
+
+      // Return to default chat instead of chat list
+      await this.returnToDefaultChat();
+
+      console.log("Message sent successfully to unsaved contact");
+
+      if (tracingEnabled && this.browserContext && logId) {
+        const tracePath = path.join(TRACES_DIR, `trace_${logId}.zip`);
+        await this.browserContext.tracing.stop({ path: tracePath });
+        console.log(`Trace saved to: ${tracePath}`);
+      }
+
+      await this.waitUntilTargetSecond();
+      await this.closeBrowser();
+    } catch (err: any) {
+      console.error("Failed to send message to unsaved contact:", err);
+
+      if (tracingEnabled && this.browserContext && logId) {
+        try {
+          const tracePath = path.join(TRACES_DIR, `trace_${logId}.zip`);
+          await this.browserContext.tracing.stop({ path: tracePath });
+          console.log(`Trace saved to: ${tracePath} (after failure)`);
+        } catch (traceErr) {
+          console.error("Failed to save trace after error:", traceErr);
+        }
+      }
 
       await this.closeBrowser();
       throw err;

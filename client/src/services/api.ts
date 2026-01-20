@@ -148,4 +148,78 @@ export const api = {
     });
     if (!res.ok) throw new Error("Failed to update setting");
   },
+
+  // Contacts
+  getContacts: async (): Promise<any[]> => {
+    const res = await fetch(`${API_BASE}/contacts`);
+    if (!res.ok) throw new Error("Failed to fetch contacts");
+    return res.json();
+  },
+
+  createContact: async (data: any): Promise<any> => {
+    const res = await fetch(`${API_BASE}/contacts`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error || "Failed to create contact");
+    }
+    return res.json();
+  },
+
+  createContactsBulk: async (
+    data: any[]
+  ): Promise<{ success: number; failed: number; errors: string[] }> => {
+    const res = await fetch(`${API_BASE}/contacts/bulk`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) throw new Error("Failed to upload contacts");
+    return res.json();
+  },
+
+  deleteContact: async (id: number): Promise<void> => {
+    const res = await fetch(`${API_BASE}/contacts/${id}`, {
+      method: "DELETE",
+    });
+    if (!res.ok) throw new Error("Failed to delete contact");
+  },
+
+  deleteAllContacts: async (): Promise<void> => {
+    const res = await fetch(`${API_BASE}/contacts`, {
+      method: "DELETE",
+    });
+    if (!res.ok) throw new Error("Failed to delete all contacts");
+  },
+
+  // Broadcasts
+  getBroadcasts: async (): Promise<any[]> => {
+    const res = await fetch(`${API_BASE}/broadcasts`);
+    if (!res.ok) throw new Error("Failed to fetch broadcasts");
+    return res.json();
+  },
+
+  createBroadcast: async (data: any): Promise<any> => {
+    const isFormData = data instanceof FormData;
+    const res = await fetch(`${API_BASE}/broadcasts`, {
+      method: "POST",
+      headers: isFormData ? {} : { "Content-Type": "application/json" },
+      body: isFormData ? data : JSON.stringify(data),
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error || "Failed to create broadcast");
+    }
+    return res.json();
+  },
+
+  deleteBroadcast: async (id: number): Promise<void> => {
+    const res = await fetch(`${API_BASE}/broadcasts/${id}`, {
+      method: "DELETE",
+    });
+    if (!res.ok) throw new Error("Failed to delete broadcast");
+  },
 };

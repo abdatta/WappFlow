@@ -1,4 +1,11 @@
-import { Calendar, MessageSquare, Plus, Settings } from "lucide-preact";
+import {
+  Calendar,
+  MessageSquare,
+  Megaphone,
+  Plus,
+  Settings,
+  Users,
+} from "lucide-preact";
 import { Link, useLocation } from "wouter-preact";
 
 export function Layout({ children }: { children: any }) {
@@ -7,6 +14,8 @@ export function Layout({ children }: { children: any }) {
   const navItems = [
     { href: "/", icon: Calendar, label: "Schedules" },
     { href: "/create", icon: Plus, label: "Create" },
+    { href: "/contacts", icon: Users, label: "Contacts" },
+    { href: "/broadcasts", icon: Megaphone, label: "Broadcasts" },
     { href: "/feedbacks", icon: MessageSquare, label: "Feedbacks" },
     { href: "/settings", icon: Settings, label: "Settings" },
   ];
