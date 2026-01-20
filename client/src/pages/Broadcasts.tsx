@@ -19,6 +19,7 @@ export function Broadcasts() {
     intervalValue: 1,
     intervalUnit: "day",
   });
+  const [attachment, setAttachment] = useState<File | null>(null);
 
   const loadData = async () => {
     try {
@@ -53,27 +54,31 @@ export function Broadcasts() {
         alert("Please select at least one contact");
         return;
       }
-      // Prepare payload
-      const payload = { ...formData };
-      if (payload.type === "instant") {
-        payload.scheduledTime = undefined;
-        payload.intervalValue = undefined;
-        payload.intervalUnit = undefined;
-      } else if (payload.type === "once") {
-        if (!payload.scheduledTime) {
-          alert("Please select a time");
-          return;
-        }
-        payload.intervalValue = undefined;
-        payload.intervalUnit = undefined;
-      } else if (payload.type === "recurring") {
-        if (!payload.scheduledTime) {
-          alert("Please select a start time");
-          return;
-        }
+
+      const form = new FormData();
+      form.append("name", formData.name);
+      form.append("message", formData.message);
+      form.append("contactIds", JSON.stringify(formData.contactIds));
+      form.append("type", formData.type || "instant");
+
+      if (formData.type !== "instant" && formData.scheduledTime) {
+        form.append("scheduledTime", formData.scheduledTime);
       }
-      await api.createBroadcast(payload);
+
+      if (formData.type === "recurring") {
+        if (formData.intervalValue)
+          form.append("intervalValue", formData.intervalValue.toString());
+        if (formData.intervalUnit)
+          form.append("intervalUnit", formData.intervalUnit);
+      }
+
+      if (attachment) {
+        form.append("attachment", attachment);
+      }
+
+      await api.createBroadcast(form);
       setShowCreate(false);
+      setAttachment(null);
       setFormData({
         name: "",
         message: "",
@@ -220,6 +225,22 @@ export function Broadcasts() {
               }
               required
               rows={3}
+            />
+          </div>
+
+          <div class="form-group">
+            <label>Attachment (Optional)</label>
+            <input
+              type="file"
+              onChange={(e) =>
+                setAttachment(e.currentTarget.files?.[0] || null)
+              }
+              style={{
+                width: "100%",
+                padding: "8px",
+                border: "1px solid #ddd",
+                borderRadius: "4px",
+              }}
             />
           </div>
 

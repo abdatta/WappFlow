@@ -88,6 +88,17 @@ router.post("/bulk", (req, res) => {
   }
 });
 
+// DELETE all contacts
+router.delete("/", (req, res) => {
+  try {
+    const stmt = db.prepare("DELETE FROM contacts");
+    const info = stmt.run();
+    res.json({ success: true, deletedCount: info.changes });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // DELETE contact
 router.delete("/:id", (req, res) => {
   const { id } = req.params;

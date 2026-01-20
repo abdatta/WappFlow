@@ -413,19 +413,19 @@ export class WhatsAppService {
     const composerSelector = "div[contenteditable='true'][data-tab]";
 
     try {
-      await this.page.waitForSelector(newChatBtnSelector, { timeout: 10000 });
+      await this.page.waitForSelector(newChatBtnSelector, { timeout: 1000 });
       await this.page.click(newChatBtnSelector);
 
-      await this.page.waitForSelector(searchInputSelector, { timeout: 10000 });
+      await this.page.waitForSelector(searchInputSelector, { timeout: 1000 });
 
       await this.page.click(searchInputSelector);
       await delay(500);
       await this.page.keyboard.type(contactNo);
 
-      await delay(2000);
-
-      // Press Enter to select the first result (contact)
-      await this.page.keyboard.press("Enter");
+      // Click the search result instead of pressing Enter
+      const contactSelector = 'div[data-tab="4"][role="button"]';
+      await this.page.waitForSelector(contactSelector, { timeout: 2000 });
+      await this.page.click(contactSelector);
 
       await this.page.waitForSelector(composerSelector, { timeout: 20000 });
       console.log(`Unsaved chat opened: ${contactNo}`);
@@ -485,6 +485,8 @@ export class WhatsAppService {
   async sendMessage(
     contactName: string,
     message: string,
+    attachmentPath?: string,
+    attachmentName?: string,
     logId?: number | bigint
   ): Promise<void> {
     console.log(`Attempting to send message to contact: ${contactName}`);
@@ -548,8 +550,56 @@ export class WhatsAppService {
       await this.page.keyboard.press(`${modifier}+V`);
       await delay(500); // Wait for paste to complete
 
-      await this.page.keyboard.press("Enter");
-      await delay(2000);
+      if (attachmentPath) {
+        console.log(
+          `Attaching file: ${attachmentPath}${attachmentName ? ` as ${attachmentName}` : ""}`
+        );
+        const fileBuffer = fs.readFileSync(attachmentPath);
+        const fileName = attachmentName || path.basename(attachmentPath);
+        const extension = path.extname(fileName).toLowerCase();
+
+        // Simple mime type map
+        const mimeTypes: { [key: string]: string } = {
+          ".png": "image/png",
+          ".jpg": "image/jpeg",
+          ".jpeg": "image/jpeg",
+          ".gif": "image/gif",
+          ".pdf": "application/pdf",
+          ".mp4": "video/mp4",
+          ".mp3": "audio/mpeg",
+          ".csv": "text/csv",
+          ".txt": "text/plain",
+          ".docx":
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+          ".xlsx":
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        };
+        const mimeType = mimeTypes[extension] || "application/octet-stream";
+
+        await this.page.evaluate(
+          async ({ buffer, name, type }) => {
+            const blob = new Blob([new Uint8Array(buffer)], { type });
+            const file = new File([blob], name, { type });
+            const dataTransfer = new DataTransfer();
+            dataTransfer.items.add(file);
+            const event = new ClipboardEvent("paste", {
+              clipboardData: dataTransfer,
+              bubbles: true,
+              cancelable: true,
+            });
+            document.activeElement?.dispatchEvent(event);
+          },
+          { buffer: Array.from(fileBuffer), name: fileName, type: mimeType }
+        );
+
+        console.log("Waiting for attachment to load...");
+        await delay(3000); // Wait for attachment to process
+        await this.page.keyboard.press("Enter");
+        await delay(2000);
+      } else {
+        await this.page.keyboard.press("Enter");
+        await delay(2000);
+      }
 
       // Wait for message to be sent (status != 'Pending')
       // Using locator API as requested: verify last message's status icon
@@ -621,14 +671,9 @@ export class WhatsAppService {
         }
       }
 
-      await this.waitUntilTargetSecond(); // Wait before closing on error too? Usually safer to keep pattern consistent or fail fast.
-      // Requirement: "from the moment a task starts... it should remain open untill thr 55th second... It can exceed that if need be"
-      // So yes, even on error we should hypothetically wait, but often errors need fast feedback.
-      // However, "fail fast" usually wins. But let's stick to valid "task starts... keep browser open".
-      // Let's apply it to success path first and foremost. For error, maybe better to close fast?
-      // Re-reading: "make sure that from the moment a task starts... it is done with its stuff before that it should still keep the browser open"
-      // If it fails, it's technically "done with its stuff".
-      // I'll add it to the error path as well for consistency, unless user complains.
+      // Skip wait on error
+
+      // Close browser immediately on failure
 
       await this.closeBrowser();
       throw err;
@@ -638,6 +683,8 @@ export class WhatsAppService {
   async sendMessageUnsaved(
     contactNo: string,
     message: string,
+    attachmentPath?: string,
+    attachmentName?: string,
     logId?: number | bigint
   ): Promise<void> {
     console.log(`Attempting to send message to unsaved contact: ${contactNo}`);
@@ -701,8 +748,55 @@ export class WhatsAppService {
       await this.page.keyboard.press(`${modifier}+V`);
       await delay(500); // Wait for paste to complete
 
-      await this.page.keyboard.press("Enter");
-      await delay(2000);
+      if (attachmentPath) {
+        console.log(
+          `Attaching file: ${attachmentPath}${attachmentName ? ` as ${attachmentName}` : ""}`
+        );
+        const fileBuffer = fs.readFileSync(attachmentPath);
+        const fileName = attachmentName || path.basename(attachmentPath);
+        const extension = path.extname(fileName).toLowerCase();
+
+        const mimeTypes: { [key: string]: string } = {
+          ".png": "image/png",
+          ".jpg": "image/jpeg",
+          ".jpeg": "image/jpeg",
+          ".gif": "image/gif",
+          ".pdf": "application/pdf",
+          ".mp4": "video/mp4",
+          ".mp3": "audio/mpeg",
+          ".csv": "text/csv",
+          ".txt": "text/plain",
+          ".docx":
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+          ".xlsx":
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        };
+        const mimeType = mimeTypes[extension] || "application/octet-stream";
+
+        await this.page.evaluate(
+          async ({ buffer, name, type }) => {
+            const blob = new Blob([new Uint8Array(buffer)], { type });
+            const file = new File([blob], name, { type });
+            const dataTransfer = new DataTransfer();
+            dataTransfer.items.add(file);
+            const event = new ClipboardEvent("paste", {
+              clipboardData: dataTransfer,
+              bubbles: true,
+              cancelable: true,
+            });
+            document.activeElement?.dispatchEvent(event);
+          },
+          { buffer: Array.from(fileBuffer), name: fileName, type: mimeType }
+        );
+
+        console.log("Waiting for attachment to load...");
+        await delay(3000); // Wait for attachment to process
+        await this.page.keyboard.press("Enter");
+        await delay(2000);
+      } else {
+        await this.page.keyboard.press("Enter");
+        await delay(2000);
+      }
 
       // Wait for message to be sent (status != 'Pending')
       console.log("Waiting for message status to update from Pending...");
@@ -762,7 +856,6 @@ export class WhatsAppService {
         }
       }
 
-      await this.waitUntilTargetSecond();
       await this.closeBrowser();
       throw err;
     }

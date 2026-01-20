@@ -188,6 +188,13 @@ export const api = {
     if (!res.ok) throw new Error("Failed to delete contact");
   },
 
+  deleteAllContacts: async (): Promise<void> => {
+    const res = await fetch(`${API_BASE}/contacts`, {
+      method: "DELETE",
+    });
+    if (!res.ok) throw new Error("Failed to delete all contacts");
+  },
+
   // Broadcasts
   getBroadcasts: async (): Promise<any[]> => {
     const res = await fetch(`${API_BASE}/broadcasts`);
@@ -196,10 +203,11 @@ export const api = {
   },
 
   createBroadcast: async (data: any): Promise<any> => {
+    const isFormData = data instanceof FormData;
     const res = await fetch(`${API_BASE}/broadcasts`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(data),
+      headers: isFormData ? {} : { "Content-Type": "application/json" },
+      body: isFormData ? data : JSON.stringify(data),
     });
     if (!res.ok) {
       const err = await res.json();

@@ -13,6 +13,8 @@ export interface Broadcast {
   id: number;
   name: string;
   message: string;
+  attachmentPath?: string;
+  attachmentName?: string;
   status: "draft" | "scheduled" | "processing" | "completed" | "failed";
   scheduledTime?: string;
   type?: "instant" | "once" | "recurring";
@@ -42,6 +44,8 @@ export interface CreateContactDto {
 export interface CreateBroadcastDto {
   name: string;
   message: string;
+  attachmentPath?: string;
+  attachmentName?: string;
   contactIds: number[];
   scheduledTime?: string;
   type?: "instant" | "once" | "recurring";

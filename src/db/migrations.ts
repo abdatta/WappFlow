@@ -276,6 +276,31 @@ export function runMigrations(db: Database.Database) {
     console.warn("Error migrating broadcasts schema:", err);
   }
 
+  // Add attachmentPath migration
+  try {
+    const broadcastsInfo = db
+      .prepare("PRAGMA table_info(broadcasts)")
+      .all() as any[];
+    if (broadcastsInfo.length > 0) {
+      const hasAttachment = broadcastsInfo.some(
+        (col) => col.name === "attachmentPath"
+      );
+      if (!hasAttachment) {
+        console.log("Adding attachmentPath column to broadcasts...");
+        db.exec("ALTER TABLE broadcasts ADD COLUMN attachmentPath TEXT");
+      }
+      const hasAttachmentName = broadcastsInfo.some(
+        (col) => col.name === "attachmentName"
+      );
+      if (!hasAttachmentName) {
+        console.log("Adding attachmentName column to broadcasts...");
+        db.exec("ALTER TABLE broadcasts ADD COLUMN attachmentName TEXT");
+      }
+    }
+  } catch (err) {
+    console.warn("Error migrating broadcasts attachment schema:", err);
+  }
+
   // Broadcasts Table
   db.exec(`
     CREATE TABLE IF NOT EXISTS broadcasts (
@@ -289,6 +314,8 @@ export function runMigrations(db: Database.Database) {
       intervalUnit TEXT,
       nextRun TEXT,
       lastRun TEXT,
+      attachmentPath TEXT,
+      attachmentName TEXT,
       createdAt TEXT DEFAULT CURRENT_TIMESTAMP
     );
   `);

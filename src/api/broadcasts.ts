@@ -3,8 +3,27 @@ import db from "../db/db.js";
 import { Broadcast, Contact } from "../../shared/types.js";
 import { createBroadcastSchema } from "../validations/broadcastSchemas.js";
 import { whatsappService } from "../services/whatsapp.js";
+import multer from "multer";
+import path from "path";
+import fs from "fs";
 
 const router = Router();
+
+// Setup multer for file uploads
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const uploadDir = path.resolve("data/uploads");
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
+    }
+    cb(null, uploadDir);
+  },
+  filename: (req, file, cb) => {
+    cb(null, `${Date.now()}-${file.originalname}`);
+  },
+});
+
+const upload = multer({ storage });
 
 // GET all broadcasts
 router.get("/", (req, res) => {
@@ -46,43 +65,53 @@ router.get("/:id", (req, res) => {
 });
 
 // POST create broadcast
-router.post("/", async (req, res) => {
-  const validation = createBroadcastSchema.safeParse(req.body);
-  if (!validation.success) {
-    return res.status(400).json({ error: validation.error.issues[0].message });
-  }
-  const {
-    name,
-    message,
-    contactIds,
-    scheduledTime,
-    type,
-    intervalValue,
-    intervalUnit,
-  } = validation.data;
-
-  // Logic for status:
-  // If recurring => 'scheduled' (and nextRun = scheduledTime)
-  // If once => 'scheduled' if scheduledTime is set
-  // If instant => 'processing' (or handled immediately, but sticking to 'draft'/'scheduled' logic for now)
-  // BUT existing code says: scheduledTime ? "scheduled" : "draft"
-
-  let status = scheduledTime ? "scheduled" : "draft";
-  const broadcastType = type || (scheduledTime ? "once" : "instant");
-
-  // If recurring, we might want to ensure status is 'scheduled'
-  if (broadcastType === "recurring") {
-    status = "scheduled";
-  } else if (broadcastType === "instant") {
-    status = "processing";
-  }
-
+router.post("/", upload.single("attachment"), async (req, res) => {
   try {
+    // If contactIds is coming as a string (from FormData), parse it
+    if (typeof req.body.contactIds === "string") {
+      try {
+        req.body.contactIds = JSON.parse(req.body.contactIds);
+      } catch (e) {
+        // Fallback or ignore
+      }
+    }
+    // Convert numerical strings
+    if (req.body.intervalValue) {
+      req.body.intervalValue = parseInt(req.body.intervalValue);
+    }
+
+    const validation = createBroadcastSchema.safeParse(req.body);
+    if (!validation.success) {
+      return res
+        .status(400)
+        .json({ error: validation.error.issues[0].message });
+    }
+    const {
+      name,
+      message,
+      contactIds,
+      scheduledTime,
+      type,
+      intervalValue,
+      intervalUnit,
+    } = validation.data;
+
+    const attachmentPath = req.file ? req.file.path : null;
+    const attachmentName = req.file ? req.file.originalname : null;
+
+    let status = scheduledTime ? "scheduled" : "draft";
+    const broadcastType = type || (scheduledTime ? "once" : "instant");
+
+    if (broadcastType === "recurring") {
+      status = "scheduled";
+    } else if (broadcastType === "instant") {
+      status = "processing";
+    }
+
     const trans = db.transaction(() => {
       const stmt = db.prepare(
-        "INSERT INTO broadcasts (name, message, scheduledTime, status, type, intervalValue, intervalUnit, nextRun) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+        "INSERT INTO broadcasts (name, message, scheduledTime, status, type, intervalValue, intervalUnit, nextRun, attachmentPath, attachmentName) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
       );
-      // For recurring, nextRun is initially the scheduledTime
       const nextRun = broadcastType === "recurring" ? scheduledTime : null;
 
       const info = stmt.run(
@@ -93,7 +122,9 @@ router.post("/", async (req, res) => {
         broadcastType,
         intervalValue || null,
         intervalUnit || null,
-        nextRun
+        nextRun,
+        attachmentPath,
+        attachmentName
       );
       const broadcastId = info.lastInsertRowid;
 
@@ -113,13 +144,6 @@ router.post("/", async (req, res) => {
 
     // Send immediately if instant
     if (broadcastType === "instant") {
-      // Run asynchronously to not block response?
-      // User said "just like schedules" which awaits. Schedules handles 1 msg.
-      // Broadcast can be many. If we await, it might timeout.
-      // BUT, sending unsaved opens/closes browser. Doing this in loop is VERY SLOW.
-      // We will attempt to send one by one.
-
-      // Fetch contacts
       const placeholders = contactIds.map(() => "?").join(",");
       const contacts = db
         .prepare(`SELECT * FROM contacts WHERE id IN (${placeholders})`)
@@ -129,16 +153,15 @@ router.post("/", async (req, res) => {
         `Processing instant broadcast ${id} for ${contacts.length} contacts...`
       );
 
-      // We'll process this in background so we can return response?
-      // schedules.ts awaits. But schedules creates 1 task.
-      // If I await here, 10 contacts * 10 seconds = 100 seconds timeout.
-      // I will process in background, but log errors.
-
       (async () => {
         for (const contact of contacts) {
           try {
-            await whatsappService.sendMessageUnsaved(contact.number, message);
-            // Update recipient status
+            await whatsappService.sendMessageUnsaved(
+              contact.number,
+              message,
+              attachmentPath || undefined,
+              attachmentName || undefined
+            );
             db.prepare(
               "UPDATE broadcast_recipients SET status = 'sent', sentAt = CURRENT_TIMESTAMP WHERE broadcastId = ? AND contactId = ?"
             ).run(id, contact.id);
@@ -152,7 +175,6 @@ router.post("/", async (req, res) => {
             ).run(err.message, id, contact.id);
           }
         }
-        // Update broadcast status to completed
         db.prepare(
           "UPDATE broadcasts SET status = 'completed' WHERE id = ?"
         ).run(id);
@@ -161,6 +183,7 @@ router.post("/", async (req, res) => {
 
     res.status(201).json(newBroadcast);
   } catch (err: any) {
+    console.error("Broadcast creation error:", err);
     res.status(500).json({ error: err.message });
   }
 });

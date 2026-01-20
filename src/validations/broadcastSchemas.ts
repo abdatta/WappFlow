@@ -3,6 +3,7 @@ import { z } from "zod";
 export const createBroadcastSchema = z.object({
   name: z.string().min(1, "Broadcast name is required"),
   message: z.string().min(1, "Message is required"),
+  attachmentPath: z.string().optional().nullable(),
   contactIds: z.array(z.number()).min(1, "At least one contact is required"),
   scheduledTime: z.string().optional().nullable(),
   type: z.enum(["instant", "once", "recurring"]).optional(),

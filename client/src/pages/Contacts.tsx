@@ -39,6 +39,21 @@ export function Contacts() {
     }
   };
 
+  const handleDeleteAll = async () => {
+    if (
+      confirm(
+        "Are you sure you want to delete ALL contacts? This cannot be undone."
+      )
+    ) {
+      try {
+        await api.deleteAllContacts();
+        loadContacts();
+      } catch (err: any) {
+        alert(err.message);
+      }
+    }
+  };
+
   const handleCreate = async (e: Event) => {
     e.preventDefault();
     try {
@@ -140,6 +155,15 @@ export function Contacts() {
       <div class="page-header">
         <h2>Contacts</h2>
         <div class="actions">
+          {contacts.length > 0 && (
+            <button
+              class="btn-cancel"
+              onClick={handleDeleteAll}
+              style={{ backgroundColor: "#ff4444", color: "white" }}
+            >
+              <Trash2 size={18} /> Remove All
+            </button>
+          )}
           <button class="btn-secondary" onClick={handleDownloadTemplate}>
             <Download size={18} /> Template
           </button>
