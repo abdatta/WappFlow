@@ -68,6 +68,10 @@ export default defineConfig(({ mode }) => {
           changeOrigin: true,
           ws: true, // Enable WebSocket proxying
         },
+        "/screenshots": {
+          target: `http://localhost:${PORT}`,
+          changeOrigin: true,
+        },
       },
     },
   };

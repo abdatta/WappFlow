@@ -29,6 +29,9 @@ app.use(express.json());
 const CLIENT_BUILD_PATH = path.resolve("client/dist");
 app.use(express.static(CLIENT_BUILD_PATH));
 
+// Serve screenshots
+app.use("/screenshots", express.static(path.resolve("data/screenshots")));
+
 // API Routes
 import schedulesRouter from "./api/schedules.js";
 import whatsappRouter from "./api/whatsapp.js";

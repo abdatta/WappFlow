@@ -27,12 +27,58 @@ export function runMigrations(db: Database.Database) {
       type TEXT NOT NULL CHECK(type IN ('instant', 'once', 'recurring')),
       contactName TEXT NOT NULL,
       message TEXT NOT NULL,
-      status TEXT NOT NULL CHECK(status IN ('sending', 'sent', 'failed')),
+      status TEXT NOT NULL CHECK(status IN ('sending', 'sent', 'failed', 'unknown')),
       timestamp TEXT DEFAULT CURRENT_TIMESTAMP,
       error TEXT,
       FOREIGN KEY (scheduleId) REFERENCES schedules(id) ON DELETE CASCADE
     );
   `);
+
+  // Migration: Add 'unknown' to status check constraint if not present
+  try {
+    const tableInfo = db
+      .prepare(
+        "SELECT sql FROM sqlite_master WHERE type='table' AND name='message_logs'"
+      )
+      .get() as { sql: string };
+
+    if (tableInfo && !tableInfo.sql.includes("'unknown'")) {
+      console.log("Migrating message_logs to include 'unknown' status...");
+
+      db.transaction(() => {
+        // 1. Rename old table
+        db.exec("ALTER TABLE message_logs RENAME TO message_logs_old");
+
+        // 2. Create new table (same as above definition)
+        db.exec(`
+          CREATE TABLE message_logs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            scheduleId INTEGER,
+            type TEXT NOT NULL CHECK(type IN ('instant', 'once', 'recurring')),
+            contactName TEXT NOT NULL,
+            message TEXT NOT NULL,
+            status TEXT NOT NULL CHECK(status IN ('sending', 'sent', 'failed', 'unknown')),
+            timestamp TEXT DEFAULT CURRENT_TIMESTAMP,
+            error TEXT,
+            FOREIGN KEY (scheduleId) REFERENCES schedules(id) ON DELETE CASCADE
+          )
+        `);
+
+        // 3. Copy data
+        db.exec(`
+          INSERT INTO message_logs (id, scheduleId, type, contactName, message, status, timestamp, error)
+          SELECT id, scheduleId, type, contactName, message, status, timestamp, error FROM message_logs_old
+        `);
+
+        // 4. Drop old table
+        db.exec("DROP TABLE message_logs_old");
+      })();
+
+      console.log("Migration 'message_logs_unknown_status' completed.");
+    }
+  } catch (err) {
+    console.error("Migration failed:", err);
+  }
 
   // Settings / KV Store
   db.exec(`

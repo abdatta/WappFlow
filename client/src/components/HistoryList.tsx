@@ -1,4 +1,4 @@
-import { Download } from "lucide-preact";
+import { Download, Image } from "lucide-preact";
 import { useEffect, useState } from "preact/hooks";
 import { api } from "../services/api";
 import "./HistoryList.css";
@@ -8,7 +8,7 @@ interface Log {
   type: "instant" | "once" | "recurring";
   contactName: string;
   message: string;
-  status: "sending" | "sent" | "failed";
+  status: "sending" | "sent" | "failed" | "unknown";
   timestamp: number;
   error?: string;
   hasTrace?: boolean;
@@ -41,6 +41,9 @@ export function HistoryList() {
   const [logs, setLogs] = useState<Log[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState<number | null>(null);
+  const [selectedScreenshot, setSelectedScreenshot] = useState<string | null>(
+    null
+  );
 
   const fetchHistory = async () => {
     try {
@@ -104,6 +107,11 @@ export function HistoryList() {
                   {log.status === "failed" && (
                     <span class="icon-failed">❌</span>
                   )}
+                  {log.status === "unknown" && (
+                    <span class="icon-unknown" style={{ color: "orange" }}>
+                      ❔
+                    </span>
+                  )}
                   <span class="status-text">{log.status}</span>
                 </div>
               </div>
@@ -112,6 +120,35 @@ export function HistoryList() {
                 {log.error && expandedId === log.id && (
                   <div class="error-details">
                     <strong>Error:</strong> {log.error}
+                  </div>
+                )}
+                {log.status === "unknown" && expandedId === log.id && (
+                  <div class="screenshot-view" style={{ marginTop: "0.5rem" }}>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedScreenshot(
+                          `/screenshots/unknown_run_${log.id}.png`
+                        );
+                      }}
+                      class="btn-small"
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "0.5rem",
+                        padding: "0.5rem 1rem",
+                        background: "var(--bg-elevated)",
+                        border: "1px solid var(--border)",
+                        borderRadius: "var(--radius-md)",
+                        color: "var(--text)",
+                        fontSize: "0.875rem",
+                        fontWeight: 500,
+                        cursor: "pointer",
+                      }}
+                    >
+                      <Image size={16} />
+                      View Screenshot
+                    </button>
                   </div>
                 )}
                 {log.hasTrace && expandedId === log.id && (
@@ -174,6 +211,67 @@ export function HistoryList() {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {selectedScreenshot && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: "rgba(0, 0, 0, 0.8)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 1000,
+            padding: "2rem",
+          }}
+          onClick={() => setSelectedScreenshot(null)}
+        >
+          <div
+            style={{
+              position: "relative",
+              maxWidth: "100%",
+              maxHeight: "100%",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <img
+              src={selectedScreenshot}
+              alt="Failure Screenshot"
+              style={{
+                maxWidth: "100%",
+                maxHeight: "90vh",
+                borderRadius: "8px",
+                boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1)",
+              }}
+            />
+            <button
+              onClick={() => setSelectedScreenshot(null)}
+              style={{
+                position: "absolute",
+                top: "-1rem",
+                right: "-1rem",
+                background: "white",
+                border: "none",
+                borderRadius: "50%",
+                width: "2rem",
+                height: "2rem",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                cursor: "pointer",
+                boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
+                color: "black",
+                fontWeight: "bold",
+              }}
+            >
+              ×
+            </button>
+          </div>
         </div>
       )}
     </div>

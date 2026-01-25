@@ -1,7 +1,7 @@
 import cron from "node-cron";
 import { Schedule } from "../../shared/types.js";
 import db from "../db/db.js";
-import { whatsappService } from "./whatsapp.js";
+import { whatsappService, MessageUnknownError } from "./whatsapp.js";
 
 class SchedulerService {
   private tasks: Map<number, cron.ScheduledTask> = new Map();
@@ -297,13 +297,26 @@ class SchedulerService {
     } catch (err: any) {
       console.error(`Failed to execute schedule ${schedule.id}:`, err);
 
-      // Retry logic: retry once if we're still within tolerance
-      if (!isRetry && schedule.type === "recurring" && schedule.nextRun) {
+      let status: "failed" | "unknown" = "failed";
+      if (err.name === "MessageUnknownError") {
+        status = "unknown";
+      }
+
+      // Retry logic: retry once if we're still within tolerance (skip if unknown)
+      if (
+        status === "failed" &&
+        !isRetry &&
+        schedule.type === "recurring" &&
+        schedule.nextRun
+      ) {
         // ... (retry logic)
       }
 
       // Handle failure
       if (schedule.type === "once") {
+        // If unknown, we still mark schedule as 'failed' (or completed?) in this simplistic model,
+        // OR we just leave it active?
+        // For 'once', usually we want to stop it. 'failed' stops it.
         db.prepare("UPDATE schedules SET status = 'failed' WHERE id = ?").run(
           schedule.id
         );
@@ -313,7 +326,7 @@ class SchedulerService {
         this.updateNextRun(schedule);
       }
 
-      this.updateHistoryEntry(logId, "failed", err.message);
+      this.updateHistoryEntry(logId, status, err.message);
     } finally {
       // Always clean up running state
       this.runningTasks.delete(schedule.id);
@@ -340,7 +353,7 @@ class SchedulerService {
 
   private updateHistoryEntry(
     logId: number | bigint,
-    status: "sent" | "failed",
+    status: "sent" | "failed" | "unknown",
     error?: string
   ) {
     db.prepare(

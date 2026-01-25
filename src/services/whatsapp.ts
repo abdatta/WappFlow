@@ -11,9 +11,12 @@ function delay(ms: number): Promise<void> {
 const USER_DATA_DIR = path.resolve("data/whatsapp_session");
 const STATUS_FILE = path.resolve("data/whatsapp_session_status.json");
 const TRACES_DIR = path.resolve("data/traces");
+const SCREENSHOTS_DIR = path.resolve("data/screenshots");
 
-// Configuration: Keep browser open until this second of the minute (0-59)
-const BROWSER_CLOSE_TARGET_SECOND = 55;
+// Ensure screenshots directory exists
+if (!fs.existsSync(SCREENSHOTS_DIR)) {
+  fs.mkdirSync(SCREENSHOTS_DIR, { recursive: true });
+}
 
 // Ensure traces directory exists
 if (!fs.existsSync(TRACES_DIR)) {
@@ -28,7 +31,15 @@ interface SessionStatus {
 type QRCallback = (qrCode: string | null) => void;
 type AuthCallback = () => void;
 type StreamCallback = (image: string) => void;
+
 type ErrorCallback = (error: string) => void;
+
+export class MessageUnknownError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "MessageUnknownError";
+  }
+}
 
 export class WhatsAppService {
   private browserContext: BrowserContext | null = null;
@@ -403,39 +414,6 @@ export class WhatsAppService {
     }
   }
 
-  private async waitUntilTargetSecond(): Promise<void> {
-    // Check if configuration is valid (0-59)
-    if (BROWSER_CLOSE_TARGET_SECOND < 0 || BROWSER_CLOSE_TARGET_SECOND > 59) {
-      console.warn(
-        `Invalid BROWSER_CLOSE_TARGET_SECOND: ${BROWSER_CLOSE_TARGET_SECOND}. Skipping wait.`
-      );
-      return;
-    }
-
-    const now = new Date();
-    const currentSecond = now.getSeconds();
-
-    // If we are already past the target second, we don't wait (or waiting would mean waiting for the NEXT minute, which might be too long/unintended?)
-    // Requirement says: "untill thr 55th second of the minute at least"
-    // Interpretation: If it's currently 10s, wait 45s. If it's 58s, closing immediately is fine (met "at least").
-    // OR: If it's 58s, it means we passed the 55th second of THIS minute, so we are good.
-
-    if (currentSecond >= BROWSER_CLOSE_TARGET_SECOND) {
-      console.log(
-        `Current second (${currentSecond}) >= target (${BROWSER_CLOSE_TARGET_SECOND}). Closing immediately.`
-      );
-      return;
-    }
-
-    const secondsToWait = BROWSER_CLOSE_TARGET_SECOND - currentSecond;
-    const msToWait = secondsToWait * 1000;
-
-    console.log(
-      `Waiting ${secondsToWait} seconds until the ${BROWSER_CLOSE_TARGET_SECOND}th second of the minute...`
-    );
-    await delay(msToWait);
-  }
-
   private async returnToDefaultChat(): Promise<void> {
     const defaultChat = process.env.WHATSAPP_DEFAULT_CHAT;
     if (defaultChat) {
@@ -543,9 +521,29 @@ export class WhatsAppService {
           null, // No arguments passed
           { timeout: 20000 }
         )
-        .catch((err) => {
-          throw new Error(
-            `Message status verification timed out: ${err.message}. This likely means the message remained 'Pending' or wasn't found.`
+        .catch(async (err) => {
+          console.error(
+            `Message status verification timed out: ${err.message}. Marking as unknown.`
+          );
+
+          // Take screenshot if logId is present
+          if (logId) {
+            const screenshotPath = path.join(
+              SCREENSHOTS_DIR,
+              `unknown_run_${logId}.png`
+            );
+            try {
+              if (this.page) {
+                await this.page.screenshot({ path: screenshotPath });
+                console.log(`Saved screenshot to ${screenshotPath}`);
+              }
+            } catch (shotErr) {
+              console.error("Failed to take failure screenshot", shotErr);
+            }
+          }
+
+          throw new MessageUnknownError(
+            "Message sent but status verification timed out."
           );
         });
 
@@ -562,7 +560,6 @@ export class WhatsAppService {
         console.log(`Trace saved to: ${tracePath}`);
       }
 
-      await this.waitUntilTargetSecond();
       await this.closeBrowser();
     } catch (err: any) {
       console.error("Failed to send message to contact:", err);
@@ -576,15 +573,6 @@ export class WhatsAppService {
           console.error("Failed to save trace after error:", traceErr);
         }
       }
-
-      await this.waitUntilTargetSecond(); // Wait before closing on error too? Usually safer to keep pattern consistent or fail fast.
-      // Requirement: "from the moment a task starts... it should remain open untill thr 55th second... It can exceed that if need be"
-      // So yes, even on error we should hypothetically wait, but often errors need fast feedback.
-      // However, "fail fast" usually wins. But let's stick to valid "task starts... keep browser open".
-      // Let's apply it to success path first and foremost. For error, maybe better to close fast?
-      // Re-reading: "make sure that from the moment a task starts... it is done with its stuff before that it should still keep the browser open"
-      // If it fails, it's technically "done with its stuff".
-      // I'll add it to the error path as well for consistency, unless user complains.
 
       await this.closeBrowser();
       throw err;
