@@ -55,12 +55,55 @@ jobs:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
-      - name: Deploy via SSH
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_KEY }}
-          port: ${{ secrets.SSH_PORT }}
-          script: |
-            "${{ secrets.DEPLOY_SCRIPT_PATH }}"
+      - name: Trigger Deploy Webhook
+        run: |
+          response=$(curl -s -w "\n%{http_code}" -X POST "${{ secrets.DEPLOY_URL }}/api/deploy" \
+            -H "X-Deploy-Token: ${{ secrets.DEPLOY_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            --max-time 30)
+
+          http_code=$(echo "$response" | tail -n1)
+          body=$(echo "$response" | sed '$d')
+
+          echo "Response: $body"
+          echo "HTTP Status: $http_code"
+
+          if [ "$http_code" -ne 202 ]; then
+            echo "Deployment trigger failed with status $http_code"
+            exit 1
+          fi
+
+          echo "Deployment triggered successfully!"
+
+      - name: Wait for Deployment
+        run: |
+          echo "Polling deployment status..."
+          max_attempts=60  # 5 minutes (60 * 5 seconds)
+          attempt=0
+
+          while [ $attempt -lt $max_attempts ]; do
+            sleep 5
+            attempt=$((attempt + 1))
+
+            response=$(curl -s "${{ secrets.DEPLOY_URL }}/api/deploy/status" \
+              --max-time 10 2>/dev/null || echo '{"status":"unreachable"}')
+
+            status=$(echo "$response" | grep -o '"status":"[^"]*"' | cut -d'"' -f4)
+            step=$(echo "$response" | grep -o '"step":"[^"]*"' | cut -d'"' -f4)
+            error=$(echo "$response" | grep -o '"error":"[^"]*"' | cut -d'"' -f4)
+
+            echo "Attempt $attempt/$max_attempts: Status=$status, Step=$step"
+
+            if [ "$status" = "success" ]; then
+              echo "✅ Deployment completed successfully!"
+              exit 0
+            elif [ "$status" = "failed" ]; then
+              echo "❌ Deployment failed: $error"
+              exit 1
+            elif [ "$status" = "unreachable" ]; then
+              echo "⚠️ Server unreachable, waiting..."
+            fi
+          done
+
+          echo "❌ Deployment timed out after 5 minutes"
+          exit 1

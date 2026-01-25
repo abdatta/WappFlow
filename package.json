@@ -15,6 +15,10 @@
     "build:client": "npm run build --workspace=client",
     "build:server": "tsc -p tsconfig.json",
     "start": "node dist/src/server.js",
+    "start:pm2": "pm2 start ecosystem.config.cjs",
+    "stop:pm2": "pm2 stop wapp-flow",
+    "restart:pm2": "pm2 restart wapp-flow",
+    "logs:pm2": "pm2 logs wapp-flow",
     "lint": "concurrently \"prettier --check .\" \"npm run typecheck:server\" \"npm run typecheck:client\"",
     "typecheck:server": "tsc --noEmit",
     "typecheck:client": "tsc --noEmit -p client",
@@ -57,6 +61,7 @@
     "web-push": "^3.6.7",
     "wouter": "^3.3.5",
     "ws": "^8.19.0",
-    "zod": "^4.3.5"
+    "zod": "^4.3.5",
+    "pm2": "^5.3.0"
   }
 }

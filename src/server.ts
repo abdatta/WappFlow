@@ -51,6 +51,9 @@ app.use("/api/feedbacks", feedbacksRouter);
 import settingsRouter from "./api/settings.js";
 app.use("/api/settings", settingsRouter);
 
+import deployRouter from "./api/deploy.js";
+app.use("/api/deploy", deployRouter);
+
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok", time: new Date().toISOString() });
 });
