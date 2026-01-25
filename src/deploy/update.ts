@@ -113,7 +113,7 @@ async function main(): Promise<void> {
     exec("git pull origin main", "Pulling latest code");
 
     // Step 3: Install dependencies
-    exec("npm ci", "Installing dependencies");
+    exec("npm install", "Installing dependencies");
 
     // Step 4: Build the project
     exec("npm run build", "Building project");
