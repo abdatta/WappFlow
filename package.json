@@ -8,6 +8,7 @@
   ],
   "scripts": {
     "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
+    "test": "vitest run",
     "dev:server": "tsx watch src/server.ts",
     "dev:client": "npm run dev --workspace=client",
     "build": "npm run build:client && npm run build:server",
@@ -42,7 +43,8 @@
     "prettier": "^3.4.2",
     "prettier-plugin-organize-imports": "^4.3.0",
     "tsx": "^4.19.2",
-    "typescript": "^5.7.2"
+    "typescript": "^5.7.2",
+    "vitest": "^4.0.18"
   },
   "dependencies": {
     "better-sqlite3": "^11.6.0",
