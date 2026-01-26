@@ -76,6 +76,49 @@
    - **Frontend**: Accessible at `http://localhost:5173`
    - **Backend**: Runs on `http://localhost:3000`
 
+## 🔄 Auto-start on Boot
+
+### Windows
+
+To ensure the application starts automatically when your Windows machine restarts:
+
+1.  **Locate the Startup Script**:
+    There is a `scripts\start_app.bat` file in the project.
+
+2.  **Add to Startup Folder**:
+    - Press `Win + R`, type `shell:startup`, and press Enter. This opens your user's Startup folder.
+    - **Right-click** and drag the `scripts\start_app.bat` file from the project folder into the Startup folder.
+    - Select **"Create shortcuts here"** from the context menu.
+
+### Linux & macOS
+
+For Unix-based systems, you can use the `scripts/start_app.sh` script manually, but the recommended way to ensure auto-start on boot is using PM2's native startup generation:
+
+1.  **Start the app once**:
+
+    ```bash
+    npm run start:pm2
+    ```
+
+2.  **Generate startup script**:
+
+    ```bash
+    npx pm2 startup
+    ```
+
+    _Build the command output by PM2 and run it._
+
+3.  **Freeze process list**:
+    ```bash
+    npx pm2 save
+    ```
+
+Alternatively, you can use the provided script for manual starting:
+
+```bash
+./scripts/start_app.sh
+```
+
 ## 🔗 Connecting WhatsApp
 
 1. Open the application at `http://localhost:5173`.
