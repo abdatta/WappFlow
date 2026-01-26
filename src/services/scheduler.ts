@@ -2,6 +2,7 @@ import cron from "node-cron";
 import { Schedule } from "../../shared/types.js";
 import db from "../db/db.js";
 import { whatsappService, MessageUnknownError } from "./whatsapp.js";
+import { notificationService } from "./notifications.js";
 
 class SchedulerService {
   private tasks: Map<number, cron.ScheduledTask> = new Map();
@@ -293,7 +294,12 @@ class SchedulerService {
 
       this.updateHistoryEntry(logId, "sent");
 
-      // TODO: Send notification to user
+      this.updateHistoryEntry(logId, "sent");
+
+      notificationService.sendNotification({
+        title: "Schedule Sent",
+        body: `Message to ${schedule.contactName} sent successfully.`,
+      });
     } catch (err: any) {
       console.error(`Failed to execute schedule ${schedule.id}:`, err);
 
@@ -327,6 +333,11 @@ class SchedulerService {
       }
 
       this.updateHistoryEntry(logId, status, err.message);
+
+      notificationService.sendNotification({
+        title: "Schedule Failed",
+        body: `Failed to send to ${schedule.contactName}: ${err.message}`,
+      });
     } finally {
       // Always clean up running state
       this.runningTasks.delete(schedule.id);

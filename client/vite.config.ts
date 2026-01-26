@@ -13,9 +13,13 @@ export default defineConfig(({ mode }) => {
     plugins: [
       preact(),
       VitePWA({
+        strategies: "injectManifest",
+        srcDir: "src",
+        filename: "sw.ts",
         registerType: "prompt",
         devOptions: {
           enabled: true,
+          type: "module",
         },
         workbox: {
           cleanupOutdatedCaches: true,
