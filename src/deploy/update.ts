@@ -157,6 +157,7 @@ function cleanupBackup(): void {
 }
 
 async function pullLatestCode(): Promise<void> {
+  await exec("git", ["checkout", "--", "."], "Discarding local changes");
   await exec("git", ["pull", "origin", "main"], "Pulling latest code");
 }
 

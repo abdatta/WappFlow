@@ -14,7 +14,7 @@
     "build": "npm run build:client && npm run build:server",
     "build:client": "npm run build --workspace=client",
     "build:server": "tsc -p tsconfig.json",
-    "deploy:update": "tsx src/deploy/update.ts",
+    "deploy:update": "npx -y tsx src/deploy/update.ts",
     "start": "node dist/src/server.js",
     "start:pm2": "pm2 start ecosystem.config.cjs",
     "stop:pm2": "pm2 stop wapp-flow",
