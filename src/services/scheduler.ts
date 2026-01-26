@@ -297,7 +297,7 @@ class SchedulerService {
       this.updateHistoryEntry(logId, "sent");
 
       notificationService.sendNotification({
-        title: "Schedule Sent",
+        title: "Schedule Sent ✅",
         body: `Message to ${schedule.contactName} sent successfully.`,
       });
     } catch (err: any) {
@@ -335,7 +335,7 @@ class SchedulerService {
       this.updateHistoryEntry(logId, status, err.message);
 
       notificationService.sendNotification({
-        title: "Schedule Failed",
+        title: "Schedule Failed ❌",
         body: `Failed to send to ${schedule.contactName}: ${err.message}`,
       });
     } finally {
