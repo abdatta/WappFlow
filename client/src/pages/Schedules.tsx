@@ -1,14 +1,38 @@
 import type { Schedule } from "@shared/types";
-import { Clock, Pause, Play, RefreshCw, Trash2, Zap } from "lucide-preact";
+import {
+  Clock,
+  Copy,
+  Pause,
+  Pencil,
+  Play,
+  RefreshCw,
+  Trash2,
+  Zap,
+} from "lucide-preact";
 import { useEffect, useState } from "preact/hooks";
 import { Link } from "wouter-preact";
+import {
+  DropdownMenu,
+  type DropdownMenuItem,
+} from "../components/DropdownMenu";
 import { HistoryList } from "../components/HistoryList";
+import { ScheduleModal } from "../components/ScheduleModal";
 import { api } from "../services/api";
 import "./Schedules.css";
 
 export function Schedules() {
   const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Modal state
+  const [modalOpen, setModalOpen] = useState(false);
+  const [modalMode, setModalMode] = useState<"edit" | "create">("edit");
+  const [selectedSchedule, setSelectedSchedule] = useState<
+    Schedule | undefined
+  >();
+
+  // Active menu state
+  const [activeMenuId, setActiveMenuId] = useState<number | null>(null);
 
   const loadSchedules = async () => {
     try {
@@ -44,6 +68,29 @@ export function Schedules() {
       console.error("Failed to toggle pause status", err);
       alert("Failed to update status");
     }
+  };
+
+  const handleEdit = (schedule: Schedule) => {
+    setSelectedSchedule(schedule);
+    setModalMode("edit");
+    setModalOpen(true);
+    setActiveMenuId(null);
+  };
+
+  const handleCreateFrom = (schedule: Schedule) => {
+    setSelectedSchedule(schedule);
+    setModalMode("create");
+    setModalOpen(true);
+    setActiveMenuId(null);
+  };
+
+  const handleModalClose = () => {
+    setModalOpen(false);
+    setSelectedSchedule(undefined);
+  };
+
+  const handleModalSuccess = () => {
+    loadSchedules();
   };
 
   const getIcon = (type: string) => {
@@ -95,8 +142,6 @@ export function Schedules() {
 
   const getTimingText = (schedule: Schedule) => {
     const type = schedule.type;
-    // Show Paused status clearly
-    const statusPrefix = schedule.status === "paused" ? "(Paused) " : "";
 
     if (type === "instant") {
       if (schedule.lastRun) {
@@ -108,7 +153,7 @@ export function Schedules() {
 
     if (type === "once" && schedule.scheduleTime) {
       const date = new Date(schedule.scheduleTime);
-      return `${statusPrefix}Scheduled for ${formatFriendlyDate(date)}`;
+      return `Scheduled for ${formatFriendlyDate(date)}`;
     }
 
     if (type === "recurring") {
@@ -117,7 +162,7 @@ export function Schedules() {
       const unitStr = value > 1 ? `${unit}s` : unit;
       const valuePrefix = value > 1 ? ` ${value}` : "";
 
-      let text = `${statusPrefix}Every${valuePrefix} ${unitStr}`;
+      let text = `Every${valuePrefix} ${unitStr}`;
 
       if (schedule.nextRun) {
         text += `. Next Run: ${formatFriendlyDate(new Date(schedule.nextRun))}`;
@@ -162,8 +207,12 @@ export function Schedules() {
                     schedule={s}
                     onDelete={handleDelete}
                     onTogglePause={handleTogglePause}
+                    onEdit={handleEdit}
+                    onCreateFrom={handleCreateFrom}
                     getIcon={getIcon}
                     getTimingText={getTimingText}
+                    isMenuOpen={activeMenuId === s.id}
+                    onMenuToggle={(open) => setActiveMenuId(open ? s.id : null)}
                   />
                 ))}
               {schedules.filter(
@@ -182,6 +231,15 @@ export function Schedules() {
           <HistoryList />
         </>
       )}
+
+      {modalOpen && (
+        <ScheduleModal
+          schedule={selectedSchedule}
+          mode={modalMode}
+          onClose={handleModalClose}
+          onSuccess={handleModalSuccess}
+        />
+      )}
     </div>
   );
 }
@@ -190,39 +248,75 @@ function ScheduleCard({
   schedule,
   onDelete,
   onTogglePause,
+  onEdit,
+  onCreateFrom,
   getIcon,
   getTimingText,
+  isMenuOpen,
+  onMenuToggle,
 }: {
   schedule: Schedule;
   onDelete: (id: number) => void;
   onTogglePause: (schedule: Schedule) => void;
+  onEdit: (schedule: Schedule) => void;
+  onCreateFrom: (schedule: Schedule) => void;
   getIcon: (type: string) => any;
   getTimingText: (s: Schedule) => string;
+  isMenuOpen: boolean;
+  onMenuToggle: (open: boolean) => void;
 }) {
   const s = schedule;
   const isRecurring = s.type === "recurring";
   const isPaused = s.status === "paused";
+  const isInstant = s.type === "instant";
+
+  // Build menu items
+  const menuItems: DropdownMenuItem[] = [];
+
+  if (!isInstant) {
+    menuItems.push({
+      label: "Edit",
+      icon: Pencil,
+      onClick: () => onEdit(s),
+    });
+    menuItems.push({
+      label: "Create from",
+      icon: Copy,
+      onClick: () => onCreateFrom(s),
+    });
+  }
+
+  if (isRecurring) {
+    menuItems.push({
+      label: isPaused ? "Resume" : "Pause",
+      icon: isPaused ? Play : Pause,
+      onClick: () => onTogglePause(s),
+    });
+  }
+
+  menuItems.push({
+    label: "Delete",
+    icon: Trash2,
+    onClick: () => onDelete(s.id),
+    danger: true,
+  });
 
   return (
-    <div class={`schedule-card status-${s.status}`}>
+    <div
+      class={`schedule-card status-${s.status} ${isMenuOpen ? "z-active" : ""}`}
+    >
       <div class="schedule-header">
         <div class="schedule-timing">
           {getIcon(s.type)}
           <span>{getTimingText(s)}</span>
         </div>
         <div class="schedule-actions">
-          {isRecurring && (
-            <button
-              onClick={() => onTogglePause(s)}
-              class="btn-icon"
-              title={isPaused ? "Resume" : "Pause"}
-            >
-              {isPaused ? <Play size={18} /> : <Pause size={18} />}
-            </button>
-          )}
-          <button onClick={() => onDelete(s.id)} class="btn-icon">
-            <Trash2 size={18} />
-          </button>
+          {s.status === "paused" && <span class="badge-paused">Paused</span>}
+          <DropdownMenu
+            items={menuItems}
+            isOpen={isMenuOpen}
+            onOpenChange={onMenuToggle}
+          />
         </div>
       </div>
 

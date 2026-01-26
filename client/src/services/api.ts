@@ -70,6 +70,19 @@ export const api = {
     if (!res.ok) throw new Error("Failed to update status");
   },
 
+  updateSchedule: async (
+    id: number,
+    data: Partial<CreateScheduleDto>
+  ): Promise<Schedule> => {
+    const res = await fetch(`${API_BASE}/schedules/${id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) throw new Error("Failed to update schedule");
+    return res.json();
+  },
+
   // WhatsApp
   getWhatsAppStatus: async (): Promise<{
     authenticated: boolean;

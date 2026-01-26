@@ -109,4 +109,94 @@ router.patch("/:id/status", (req, res) => {
   res.json({ success: true, status });
 });
 
+// PUT update schedule
+router.put("/:id", (req, res) => {
+  const { id } = req.params;
+  const {
+    type,
+    contactName,
+    message,
+    scheduleTime,
+    intervalValue,
+    intervalUnit,
+    toleranceMinutes,
+  } = req.body;
+
+  // Validate type
+  if (type && type !== "once" && type !== "recurring") {
+    return res
+      .status(400)
+      .json({ error: "Invalid type. Use 'once' or 'recurring'." });
+  }
+
+  try {
+    // Check if schedule exists
+    const existing = db
+      .prepare("SELECT * FROM schedules WHERE id = ?")
+      .get(id) as Schedule | undefined;
+    if (!existing) {
+      return res.status(404).json({ error: "Schedule not found" });
+    }
+
+    // Build update
+    const newType = type || existing.type;
+    const newContactName = contactName || existing.contactName;
+    const newMessage = message || existing.message;
+
+    let newScheduleTime =
+      scheduleTime !== undefined ? scheduleTime : existing.scheduleTime;
+    let newIntervalValue =
+      intervalValue !== undefined ? intervalValue : existing.intervalValue;
+    let newIntervalUnit =
+      intervalUnit !== undefined ? intervalUnit : existing.intervalUnit;
+    let newToleranceMinutes =
+      toleranceMinutes !== undefined
+        ? toleranceMinutes
+        : existing.toleranceMinutes;
+    let newNextRun = existing.nextRun;
+
+    // If changing to recurring, set nextRun from scheduleTime
+    if (newType === "recurring" && newIntervalValue) {
+      newNextRun = newScheduleTime;
+    } else if (newType === "once") {
+      // Clear interval fields for 'once' type
+      newIntervalValue = undefined;
+      newIntervalUnit = undefined;
+      newToleranceMinutes = undefined;
+      newNextRun = undefined;
+    }
+
+    const stmt = db.prepare(`
+      UPDATE schedules SET
+        type = @type,
+        contactName = @contactName,
+        message = @message,
+        scheduleTime = @scheduleTime,
+        intervalValue = @intervalValue,
+        intervalUnit = @intervalUnit,
+        toleranceMinutes = @toleranceMinutes,
+        nextRun = @nextRun
+      WHERE id = @id
+    `);
+
+    stmt.run({
+      id,
+      type: newType,
+      contactName: newContactName,
+      message: newMessage,
+      scheduleTime: newScheduleTime,
+      intervalValue: newIntervalValue,
+      intervalUnit: newIntervalUnit,
+      toleranceMinutes: newToleranceMinutes,
+      nextRun: newNextRun,
+    });
+
+    const updated = db.prepare("SELECT * FROM schedules WHERE id = ?").get(id);
+    res.json(updated);
+  } catch (err: any) {
+    console.error("Error updating schedule:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 export default router;
