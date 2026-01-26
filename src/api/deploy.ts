@@ -69,6 +69,7 @@ router.post("/", (req, res) => {
     error: undefined,
     completedAt: undefined,
     step: "Starting deployment",
+    logs: [],
   });
 
   // Spawn the update script as a detached process
