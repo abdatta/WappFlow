@@ -151,7 +151,10 @@ async function pullLatestCode(): Promise<void> {
 }
 
 async function installDependencies(): Promise<void> {
-  await exec("npm", ["install"], "Installing dependencies");
+  // Force NODE_ENV to development to ensure devDependencies (like husky) are installed
+  await exec("npm", ["install"], "Installing dependencies", {
+    NODE_ENV: "development",
+  });
 }
 
 async function buildProject(): Promise<void> {
@@ -189,7 +192,8 @@ function updateStatus(step: string): void {
 function exec(
   command: string,
   args: string[],
-  description: string
+  description: string,
+  env?: NodeJS.ProcessEnv
 ): Promise<void> {
   return new Promise((resolve, reject) => {
     updateStatus(description);
@@ -199,7 +203,7 @@ function exec(
     const spawnOptions: SpawnOptions = {
       cwd: process.cwd(),
       shell: isWindows,
-      env: { ...process.env, FORCE_COLOR: "1" }, // Enable colors for npm
+      env: { ...process.env, FORCE_COLOR: "1", ...env }, // Enable colors for npm
     };
 
     const child = spawn(command, args, spawnOptions);
