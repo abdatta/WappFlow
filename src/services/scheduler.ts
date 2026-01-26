@@ -54,27 +54,12 @@ class SchedulerService {
     if (!schedule) throw new Error("Schedule not found");
 
     if (schedule.type === "recurring" && schedule.intervalValue) {
-      // Re-anchor scheduleTime to NOW so intervals calculate from this moment
-      // This "resets" the schedule effectively
-      const now = new Date();
-      const nowIso = now.toISOString();
+      // Calculate next run based on original scheduleTime to preserve cadence
+      const nextRunIso = this.updateNextRun(schedule, false);
 
-      // Update scheduleTime to now (re-anchor)
-      // Then calculate nextRun
+      db.prepare("UPDATE schedules SET status = 'active' WHERE id = ?").run(id);
 
-      // Momentarily update in-memory object to calculate nextRun based on new baseTime
-      schedule.scheduleTime = nowIso;
-
-      // Calculate next run immediately based on 'now'
-      const nextRunIso = this.updateNextRun(schedule, false); // false = not "after execution", just calculating
-
-      db.prepare(
-        "UPDATE schedules SET status = 'active', scheduleTime = ?, nextRun = ? WHERE id = ?"
-      ).run(nowIso, nextRunIso, id);
-
-      console.log(
-        `Resumed Schedule ${id}. Re-anchored to ${nowIso}, next run: ${nextRunIso}`
-      );
+      console.log(`Resumed Schedule ${id}. Next run: ${nextRunIso}`);
     } else {
       // For one-time schedules, just active it. If it's in the past it will run immediately.
       db.prepare("UPDATE schedules SET status = 'active' WHERE id = ?").run(id);
