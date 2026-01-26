@@ -65,7 +65,7 @@ export function HistoryList() {
   if (loading && logs.length === 0) return <div>Loading history...</div>;
 
   return (
-    <div class="history-list">
+    <div class="schedule-section history-list">
       <h3>Message History</h3>
       {logs.length === 0 ? (
         <p class="empty-state">No message history yet.</p>
