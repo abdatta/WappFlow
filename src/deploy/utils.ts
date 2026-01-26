@@ -106,10 +106,10 @@ export function exec(
           continue;
         }
 
-        // Clean ANSI codes for storage but keep content
-        const cleanLine = line.replace(/\x1b\[[0-9;]*m/g, "").trim();
+        // Keep ANSI codes for colored output in UI/CLI
+        const cleanLine = line.trim();
         if (cleanLine) {
-          appendLog(cleanLine, lastLineOverwritable || isOverwritable);
+          appendLog(line, lastLineOverwritable || isOverwritable);
           console.log(line);
         }
         lastLineOverwritable = false;
