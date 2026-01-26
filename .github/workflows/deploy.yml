@@ -90,13 +90,20 @@ jobs:
             response=$(curl -s "${{ secrets.DEPLOY_URL }}/api/deploy/status?fromLogIndex=$log_index" \
               --max-time 10 2>/dev/null || echo '{"status":"unreachable"}')
 
-            status=$(echo "$response" | jq -r '.status // "unknown"')
-            step=$(echo "$response" | jq -r '.step // ""')
-            error=$(echo "$response" | jq -r '.error // ""')
-            total_logs=$(echo "$response" | jq -r '.totalLogCount // 0')
-
-            # Process and display new logs
-            logs=$(echo "$response" | jq -r '.logs // []')
+            # Ensure response is valid JSON, otherwise treat as unreachable (server likely restarting returning 502/503 HTML)
+            if ! echo "$response" | jq -e . >/dev/null 2>&1; then
+              status="unreachable"
+              step=""
+              error=""
+              total_logs=0
+              logs="[]"
+            else
+              status=$(echo "$response" | jq -r '.status // "unknown"')
+              step=$(echo "$response" | jq -r '.step // ""')
+              error=$(echo "$response" | jq -r '.error // ""')
+              total_logs=$(echo "$response" | jq -r '.totalLogCount // 0')
+              logs=$(echo "$response" | jq -r '.logs // []')
+            fi
             log_count=$(echo "$logs" | jq 'length')
 
             if [ "$log_count" != "null" ] && [ "$log_count" -gt 0 ]; then
