@@ -1,0 +1,102 @@
+/* Unified styling */
+.reload-prompt-container {
+  position: fixed;
+  top: 1.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1000;
+  animation: slideDown 300ms ease-out forwards;
+  width: calc(100% - 2rem);
+  max-width: 420px;
+}
+
+.reload-prompt-box {
+  background-color: #1f2c34;
+  border: 1px solid #2a3942;
+  border-radius: 8px; /* Standard rounded corners */
+  box-shadow:
+    0 10px 15px -3px rgba(0, 0, 0, 0.2),
+    0 4px 6px -2px rgba(0, 0, 0, 0.1);
+  padding: 0.5rem 0.75rem 0.5rem 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  white-space: nowrap;
+  color: white;
+}
+
+.reload-prompt-info {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex: 1; /* Allow text to take available space */
+  min-width: 0; /* Enable text truncation if needed */
+}
+
+.reload-prompt-icon {
+  color: #00a884;
+  display: flex;
+  flex-shrink: 0;
+}
+
+.reload-prompt-message {
+  color: #e9edef;
+  font-size: 0.9rem;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.reload-prompt-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding-left: 0.5rem;
+  border-left: 1px solid #2a3942;
+  flex-shrink: 0;
+}
+
+.reload-btn-primary {
+  background-color: #00a884;
+  color: #111b21;
+  border: none;
+  padding: 0.4rem 1rem; /* Slightly larger targets */
+  border-radius: 6px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.reload-btn-primary:hover {
+  background-color: #008f6f;
+}
+
+.reload-close-btn {
+  background: transparent;
+  border: none;
+  color: #8696a0;
+  cursor: pointer;
+  padding: 0.25rem;
+  display: flex;
+  border-radius: 50%;
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+
+.reload-close-btn:hover {
+  color: white;
+  background-color: #2a3942;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -1rem);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}

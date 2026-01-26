@@ -29,37 +29,33 @@ export function App() {
     checkStatus();
   }, []);
 
-  if (loading) {
-    return (
-      <div style={{ padding: "2rem", textAlign: "center" }}>
-        <p>Loading...</p>
-      </div>
-    );
-  }
-
-  if (!authenticated) {
-    return (
-      <div style={{ maxWidth: "600px", margin: "2rem auto" }}>
-        <ConnectWhatsApp />
-      </div>
-    );
-  }
-
   return (
-    <Layout>
-      <Switch>
-        <Route path="/" component={Schedules} />
-        <Route path="/create" component={CreateSchedule} />
-        <Route path="/feedbacks" component={Feedbacks} />
-        <Route path="/settings" component={Settings} />
-        <Route>
-          <div style={{ padding: "2rem", textAlign: "center" }}>
-            <h2>404 - Not Found</h2>
-            <p>Page does not exist</p>
-          </div>
-        </Route>
-      </Switch>
+    <>
+      {loading ? (
+        <div style={{ padding: "2rem", textAlign: "center" }}>
+          <p>Loading...</p>
+        </div>
+      ) : !authenticated ? (
+        <div style={{ maxWidth: "600px", margin: "2rem auto" }}>
+          <ConnectWhatsApp />
+        </div>
+      ) : (
+        <Layout>
+          <Switch>
+            <Route path="/" component={Schedules} />
+            <Route path="/create" component={CreateSchedule} />
+            <Route path="/feedbacks" component={Feedbacks} />
+            <Route path="/settings" component={Settings} />
+            <Route>
+              <div style={{ padding: "2rem", textAlign: "center" }}>
+                <h2>404 - Not Found</h2>
+                <p>Page does not exist</p>
+              </div>
+            </Route>
+          </Switch>
+        </Layout>
+      )}
       <ReloadPrompt />
-    </Layout>
+    </>
   );
 }
