@@ -22,7 +22,10 @@ router.get("/status", (req, res) => {
       totalLogCount: status.logs.length,
     });
   } else {
-    res.json(status);
+    res.json({
+      ...status,
+      totalLogCount: status.logs?.length ?? 0,
+    });
   }
 });
 
@@ -68,9 +71,10 @@ router.post("/", (req, res) => {
   });
 
   // Spawn the update script as a detached process
-  const updateScript = path.resolve("dist/src/deploy/update.js");
+  const updateScript = path.resolve("src/deploy/update.ts");
 
-  const child = spawn(process.execPath, [updateScript], {
+  // Use "tsx" to run the TypeScript file directly so we don't rely on potentially stale dist/ files
+  const child = spawn(process.execPath, ["--import", "tsx", updateScript], {
     detached: true,
     stdio: "ignore",
     cwd: process.cwd(),
