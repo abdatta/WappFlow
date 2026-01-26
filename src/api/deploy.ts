@@ -8,10 +8,22 @@ const router = Router();
 /**
  * GET /api/deploy/status
  * Returns the current deployment status.
+ * Optionally pass ?fromLogIndex=N to get only logs starting from index N.
  */
 router.get("/status", (req, res) => {
   const status = getDeployStatus();
-  res.json(status);
+  const fromLogIndex = parseInt(req.query.fromLogIndex as string, 10);
+
+  // If fromLogIndex is provided, slice logs to only return new ones
+  if (!isNaN(fromLogIndex) && status.logs) {
+    res.json({
+      ...status,
+      logs: status.logs.slice(fromLogIndex),
+      totalLogCount: status.logs.length,
+    });
+  } else {
+    res.json(status);
+  }
 });
 
 /**

@@ -77,33 +77,74 @@ jobs:
 
       - name: Wait for Deployment
         run: |
-          echo "Polling deployment status..."
+          echo "Polling deployment status with live logs..."
           max_attempts=60  # 5 minutes (60 * 5 seconds)
           attempt=0
+          log_index=0
+          last_overwritable=""
 
           while [ $attempt -lt $max_attempts ]; do
             sleep 5
             attempt=$((attempt + 1))
 
-            response=$(curl -s "${{ secrets.DEPLOY_URL }}/api/deploy/status" \
+            response=$(curl -s "${{ secrets.DEPLOY_URL }}/api/deploy/status?fromLogIndex=$log_index" \
               --max-time 10 2>/dev/null || echo '{"status":"unreachable"}')
 
-            status=$(echo "$response" | grep -o '"status":"[^"]*"' | cut -d'"' -f4)
-            step=$(echo "$response" | grep -o '"step":"[^"]*"' | cut -d'"' -f4)
-            error=$(echo "$response" | grep -o '"error":"[^"]*"' | cut -d'"' -f4)
+            status=$(echo "$response" | jq -r '.status // "unknown"')
+            step=$(echo "$response" | jq -r '.step // ""')
+            error=$(echo "$response" | jq -r '.error // ""')
+            total_logs=$(echo "$response" | jq -r '.totalLogCount // 0')
 
-            echo "Attempt $attempt/$max_attempts: Status=$status, Step=$step"
+            # Process and display new logs
+            logs=$(echo "$response" | jq -r '.logs // []')
+            log_count=$(echo "$logs" | jq 'length')
 
+            if [ "$log_count" != "null" ] && [ "$log_count" -gt 0 ]; then
+              for i in $(seq 0 $((log_count - 1))); do
+                log_text=$(echo "$logs" | jq -r ".[$i].text // \"\"")
+                is_overwritable=$(echo "$logs" | jq -r ".[$i].overwritable // false")
+
+                if [ -n "$log_text" ]; then
+                  # Clear previous overwritable line if any
+                  if [ -n "$last_overwritable" ] && [ "$is_overwritable" = "true" ]; then
+                    printf "\r\033[K"  # Clear current line
+                  fi
+
+                  if [ "$is_overwritable" = "true" ]; then
+                    printf "\r%s" "$log_text"
+                    last_overwritable="$log_text"
+                  else
+                    if [ -n "$last_overwritable" ]; then
+                      echo ""  # New line after overwritable content
+                      last_overwritable=""
+                    fi
+                    echo "$log_text"
+                  fi
+                fi
+              done
+
+              # Update log index for next poll
+              if [ "$total_logs" != "null" ] && [ "$total_logs" -gt 0 ]; then
+                log_index=$total_logs
+              fi
+            fi
+
+            # Print status update
             if [ "$status" = "success" ]; then
+              [ -n "$last_overwritable" ] && echo ""  # Ensure newline
+              echo ""
               echo "✅ Deployment completed successfully!"
               exit 0
             elif [ "$status" = "failed" ]; then
+              [ -n "$last_overwritable" ] && echo ""  # Ensure newline
+              echo ""
               echo "❌ Deployment failed: $error"
               exit 1
             elif [ "$status" = "unreachable" ]; then
-              echo "⚠️ Server unreachable, waiting..."
+              echo "⚠️ Server unreachable (may be restarting), waiting..."
             fi
           done
 
+          echo ""
           echo "❌ Deployment timed out after 5 minutes"
           exit 1

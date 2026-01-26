@@ -1,30 +1,33 @@
 /**
- * Deployment Update Script with Rollback Protection
+ * Deployment Update Script with Rollback Protection and Live Logging
  *
  * This script is spawned by the deploy API endpoint and runs as a detached process.
  * It performs the following steps:
  * 1. Update status to "running"
  * 2. Backup the current dist folder
  * 3. Pull latest code from git
- * 4. Install dependencies
+ * 4. Install dependencies (with live progress)
  * 5. Build the project
  * 6. Restart the app via PM2
  * 7. Update status to "success" or rollback on failure
  *
+ * Logs are streamed in real-time to the status file for polling.
  * This script is cross-platform (Windows/Linux compatible).
  */
 
-import { execSync } from "child_process";
+import { spawn, SpawnOptions } from "child_process";
 import fs from "fs";
 import path from "path";
-import { setDeployStatus } from "./status.js";
+import { setDeployStatus, appendLog, clearLogs } from "./status.js";
 
 const DIST_DIR = path.resolve("dist");
 const BACKUP_DIR = path.resolve("dist.backup");
 
 function log(message: string): void {
   const timestamp = new Date().toISOString();
-  console.log(`${timestamp} [Deploy] ${message}`);
+  const line = `${timestamp} [Deploy] ${message}`;
+  console.log(line);
+  appendLog(line);
 }
 
 function updateStatus(step: string): void {
@@ -32,19 +35,81 @@ function updateStatus(step: string): void {
   log(`Status updated: ${step}`);
 }
 
-function exec(command: string, description: string): void {
-  updateStatus(description);
-  log(`${description}...`);
-  try {
-    execSync(command, {
-      stdio: "inherit",
+/**
+ * Execute a command with real-time log streaming.
+ * Captures stdout/stderr and streams to the status file.
+ */
+function exec(
+  command: string,
+  args: string[],
+  description: string
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    updateStatus(description);
+    log(`${description}...`);
+
+    const isWindows = process.platform === "win32";
+    const spawnOptions: SpawnOptions = {
       cwd: process.cwd(),
+      shell: isWindows,
+      env: { ...process.env, FORCE_COLOR: "1" }, // Enable colors for npm
+    };
+
+    const child = spawn(command, args, spawnOptions);
+
+    let lastLineOverwritable = false;
+
+    const processOutput = (data: Buffer) => {
+      const text = data.toString();
+      // Split by newlines but also handle carriage returns for progress bars
+      const lines = text.split(/(\r?\n|\r)/);
+
+      for (const line of lines) {
+        if (line === "\n" || line === "\r\n" || line === "") continue;
+
+        // Detect if this is a carriage return (overwritable line like npm progress)
+        const isOverwritable =
+          line === "\r" || (text.includes("\r") && !text.includes("\n"));
+
+        if (line === "\r") {
+          lastLineOverwritable = true;
+          continue;
+        }
+
+        // Clean ANSI codes for storage but keep content
+        const cleanLine = line.replace(/\x1b\[[0-9;]*m/g, "").trim();
+        if (cleanLine) {
+          appendLog(cleanLine, lastLineOverwritable || isOverwritable);
+          console.log(line);
+        }
+        lastLineOverwritable = false;
+      }
+    };
+
+    if (child.stdout) {
+      child.stdout.on("data", processOutput);
+    }
+
+    if (child.stderr) {
+      child.stderr.on("data", processOutput);
+    }
+
+    child.on("error", (error) => {
+      log(`${description} FAILED: ${error.message}`);
+      reject(error);
     });
-    log(`${description} completed`);
-  } catch (error) {
-    log(`${description} FAILED`);
-    throw error;
-  }
+
+    child.on("close", (code) => {
+      if (code === 0) {
+        log(`${description} completed`);
+        resolve();
+      } else {
+        const error = new Error(`Command failed with exit code ${code}`);
+        log(`${description} FAILED with exit code ${code}`);
+        reject(error);
+      }
+    });
+  });
 }
 
 function backupDist(): void {
@@ -95,6 +160,7 @@ function cleanupBackup(): void {
 
 async function main(): Promise<void> {
   log("Starting deployment update");
+  clearLogs();
   setDeployStatus({
     status: "running",
     startedAt: new Date().toISOString(),
@@ -110,16 +176,20 @@ async function main(): Promise<void> {
     backupDist();
 
     // Step 2: Pull latest code
-    exec("git pull origin main", "Pulling latest code");
+    await exec("git", ["pull", "origin", "main"], "Pulling latest code");
 
     // Step 3: Install dependencies
-    exec("npm install", "Installing dependencies");
+    await exec("npm", ["install"], "Installing dependencies");
 
     // Step 4: Build the project
-    exec("npm run build", "Building project");
+    await exec("npm", ["run", "build"], "Building project");
 
     // Step 5: Restart via PM2
-    exec("npx pm2 restart wapp-flow", "Restarting application");
+    await exec(
+      "npx",
+      ["pm2", "restart", "wapp-flow"],
+      "Restarting application"
+    );
 
     // Success! Clean up backup
     cleanupBackup();
@@ -140,10 +210,7 @@ async function main(): Promise<void> {
     if (restored) {
       log("Attempting to restart with restored backup...");
       try {
-        execSync("npx pm2 restart wapp-flow", {
-          stdio: "inherit",
-          cwd: process.cwd(),
-        });
+        await exec("npx", ["pm2", "restart", "wapp-flow"], "Rolling back");
         log("Rollback successful, app restarted with previous version");
       } catch {
         log("Failed to restart after rollback");
