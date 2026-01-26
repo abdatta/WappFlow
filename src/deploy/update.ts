@@ -18,7 +18,8 @@
 import { spawn, SpawnOptions } from "child_process";
 import fs from "fs";
 import path from "path";
-import { appendLog, clearLogs, setDeployStatus } from "./status.js";
+import { clearLogs, setDeployStatus } from "./status.js";
+import { exec, log, updateStatus } from "./utils.js";
 
 const DIST_DIR = path.resolve("dist");
 const BACKUP_DIR = path.resolve("dist.backup");
@@ -28,6 +29,14 @@ const BACKUP_DIR = path.resolve("dist.backup");
 // ==========================================
 
 async function main(): Promise<void> {
+  // Prevent the process from closing on typical signals (like when parent exits)
+  const signals = ["SIGINT", "SIGTERM", "SIGHUP"];
+  signals.forEach((signal) => {
+    process.on(signal, () => {
+      console.log(`Received ${signal}, ignoring to continue deployment...`);
+    });
+  });
+
   log("Starting deployment update");
   clearLogs();
   setDeployStatus({
@@ -66,6 +75,7 @@ async function main(): Promise<void> {
     });
 
     log("Deployment update completed successfully!");
+    process.exit(0);
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     log(`Deployment failed: ${errorMessage}`);
@@ -167,98 +177,4 @@ async function restartApp(): Promise<void> {
 
 async function rollbackApp(): Promise<void> {
   await exec("npx", ["pm2", "restart", "wapp-flow"], "Rolling back");
-}
-
-// ==========================================
-// Utilities
-// ==========================================
-
-function log(message: string): void {
-  const timestamp = new Date().toISOString();
-  const line = `${timestamp} [Deploy] ${message}`;
-  console.log(line);
-  appendLog(line);
-}
-
-function updateStatus(step: string): void {
-  setDeployStatus({ step });
-  log(`Status updated: ${step}`);
-}
-
-/**
- * Execute a command with real-time log streaming.
- * Captures stdout/stderr and streams to the status file.
- */
-function exec(
-  command: string,
-  args: string[],
-  description: string,
-  env?: NodeJS.ProcessEnv
-): Promise<void> {
-  return new Promise((resolve, reject) => {
-    updateStatus(description);
-    log(`${description}...`);
-
-    const isWindows = process.platform === "win32";
-    const spawnOptions: SpawnOptions = {
-      cwd: process.cwd(),
-      shell: isWindows,
-      env: { ...process.env, FORCE_COLOR: "1", ...env }, // Enable colors for npm
-    };
-
-    const child = spawn(command, args, spawnOptions);
-
-    let lastLineOverwritable = false;
-
-    const processOutput = (data: Buffer) => {
-      const text = data.toString();
-      // Split by newlines but also handle carriage returns for progress bars
-      const lines = text.split(/(\r?\n|\r)/);
-
-      for (const line of lines) {
-        if (line === "\n" || line === "\r\n" || line === "") continue;
-
-        // Detect if this is a carriage return (overwritable line like npm progress)
-        const isOverwritable =
-          line === "\r" || (text.includes("\r") && !text.includes("\n"));
-
-        if (line === "\r") {
-          lastLineOverwritable = true;
-          continue;
-        }
-
-        // Clean ANSI codes for storage but keep content
-        const cleanLine = line.replace(/\x1b\[[0-9;]*m/g, "").trim();
-        if (cleanLine) {
-          appendLog(cleanLine, lastLineOverwritable || isOverwritable);
-          console.log(line);
-        }
-        lastLineOverwritable = false;
-      }
-    };
-
-    if (child.stdout) {
-      child.stdout.on("data", processOutput);
-    }
-
-    if (child.stderr) {
-      child.stderr.on("data", processOutput);
-    }
-
-    child.on("error", (error) => {
-      log(`${description} FAILED: ${error.message}`);
-      reject(error);
-    });
-
-    child.on("close", (code) => {
-      if (code === 0) {
-        log(`${description} completed`);
-        resolve();
-      } else {
-        const error = new Error(`Command failed with exit code ${code}`);
-        log(`${description} FAILED with exit code ${code}`);
-        reject(error);
-      }
-    });
-  });
 }

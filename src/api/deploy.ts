@@ -2,6 +2,7 @@ import { spawn } from "child_process";
 import { Router } from "express";
 import path from "path";
 import { getDeployStatus, setDeployStatus } from "../deploy/status.js";
+import { spawnDetachedScript } from "../deploy/utils.js";
 
 const router = Router();
 
@@ -71,24 +72,21 @@ router.post("/", (req, res) => {
   });
 
   // Spawn the update script as a detached process
+  // Spawn the update script as a detached process
   const updateScript = path.resolve("src/deploy/update.ts");
 
-  // Use "tsx" to run the TypeScript file directly so we don't rely on potentially stale dist/ files
-  const child = spawn(process.execPath, ["--import", "tsx", updateScript], {
-    detached: true,
-    stdio: "ignore",
-    cwd: process.cwd(),
-    env: { ...process.env },
-  });
+  try {
+    const child = spawnDetachedScript(updateScript);
+    console.log(`Deploy: Update script spawned with PID ${child.pid}`);
 
-  child.unref();
-
-  console.log(`Deploy: Update script spawned with PID ${child.pid}`);
-
-  res.status(202).json({
-    message: "Deployment triggered",
-    pid: child.pid,
-  });
+    res.status(202).json({
+      message: "Deployment triggered",
+      pid: child.pid,
+    });
+  } catch (error) {
+    console.error("Deploy: Failed to spawn update script:", error);
+    res.status(500).json({ error: "Failed to start deployment" });
+  }
 });
 
 export default router;
