@@ -312,9 +312,7 @@ class SchedulerService {
           schedule.id
         );
       } else if (schedule.type === "recurring" && schedule.intervalValue) {
-        // For recurring tasks, update nextRun even on failure
-        // so it won't keep trying the same failed run
-        this.updateNextRun(schedule);
+        this.updateNextRun(schedule, status === "unknown");
       }
 
       this.updateHistoryEntry(logId, status, err.message);
