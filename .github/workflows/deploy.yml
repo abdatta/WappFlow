@@ -33,7 +33,7 @@ jobs:
       - name: Install dependencies
         run: npm install
       - name: Run Tests
-        run: npm test
+        run: npm run test:logs
 
   build:
     needs: [lint, test]

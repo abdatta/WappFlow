@@ -9,6 +9,7 @@
   "scripts": {
     "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
     "test": "vitest run",
+    "test:logs": "cross-env LOGS=true vitest run",
     "dev:server": "tsx watch src/server.ts",
     "dev:client": "npm run dev --workspace=client",
     "build": "npm run build:client && npm run build:server",
@@ -44,6 +45,7 @@
     "@types/web-push": "^3.6.4",
     "@types/ws": "^8.18.1",
     "concurrently": "^9.1.0",
+    "cross-env": "^10.1.0",
     "husky": "^9.1.7",
     "lint-staged": "^15.2.11",
     "prettier": "^3.4.2",

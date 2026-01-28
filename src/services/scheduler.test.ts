@@ -279,8 +279,9 @@ describe("SchedulerService", () => {
   describe("Error Handling", () => {
     it("should handle generic failures and NOT advance for retry (unless skip logic changes)", async () => {
       const now = new Date();
+      now.setSeconds(0, 0); // Align to minute
       vi.setSystemTime(now);
-      const scheduleTime = new Date(now.getTime() - 1000).toISOString();
+      const scheduleTime = now.toISOString(); // Exact alignment for retry logic verification
 
       const insertStmt = db.prepare(`
                 INSERT INTO schedules (type, contactName, message, scheduleTime, intervalValue, intervalUnit, status, nextRun)
