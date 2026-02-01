@@ -31,8 +31,15 @@ interface SessionStatus {
 type QRCallback = (qrCode: string | null) => void;
 type AuthCallback = () => void;
 type StreamCallback = (image: string) => void;
+type LoadingCallback = (percent: number, message: string) => void;
 
 type ErrorCallback = (error: string) => void;
+
+interface LoadingState {
+  isLoading: boolean;
+  percent: number;
+  message: string;
+}
 
 export class MessageUnknownError extends Error {
   constructor(message: string) {
@@ -50,6 +57,7 @@ export class WhatsAppService {
       onQR: QRCallback;
       onAuth: AuthCallback;
       onStream: StreamCallback;
+      onLoading?: LoadingCallback;
       onError: ErrorCallback;
     }
   >();
@@ -86,19 +94,84 @@ export class WhatsAppService {
     return null;
   }
 
+  private async checkForLoadingScreen(): Promise<LoadingState> {
+    if (!this.page) return { isLoading: false, percent: 0, message: "" };
+
+    try {
+      // Check for progress bar
+      const progressSelector = "progress";
+      const hasProgress = await this.page.$(progressSelector);
+
+      if (hasProgress) {
+        // Evaluate page to get text content from bodies or specific divs
+        const loadingInfo = await this.page.evaluate(() => {
+          const bodyText = document.body.innerText;
+          const match = bodyText.match(/Loading your chats.*?(\d+)%/i); // "Loading your chats [14%]"
+          if (match) {
+            return {
+              isLoading: true,
+              percent: parseInt(match[1], 10),
+              message: match[0],
+            };
+          }
+          // Fallback if regex fails but progress exists
+          return { isLoading: true, percent: 0, message: "Loading..." };
+        });
+        return loadingInfo;
+      }
+    } catch (err) {
+      // Ignore errors finding element
+    }
+
+    return { isLoading: false, percent: 0, message: "" };
+  }
+
   async checkAuthOnce(): Promise<boolean> {
     console.log("Checking WhatsApp authentication status...");
     try {
       await this.openBrowser();
-      const isAuthenticated = await this.isLoggedIn();
+
+      await this.openBrowser();
+
+      // Check loop for loading screen or auth
+      let isAuthenticated = false;
+      const startTime = Date.now();
+      const MAX_WAIT = 60000; // Wait up to 60 seconds for loading to finish
+
+      while (Date.now() - startTime < MAX_WAIT) {
+        if (!this.page) break;
+
+        // Check for success first
+        if (await this.isLoggedIn()) {
+          isAuthenticated = true;
+          break;
+        }
+
+        // Check for loading screen
+        const loadingState = await this.checkForLoadingScreen();
+        if (loadingState.isLoading) {
+          console.log(`WhatsApp Loading: ${loadingState.message}`);
+        } else {
+          // If neither logged in nor loading, it might be the QR screen (authed=false)
+          // But we give it a few retries in case it's just initializing
+          if (Date.now() - startTime > 10000) {
+            // After 10s of no loading screen and no auth, assume disconnected
+            break;
+          }
+        }
+        await delay(1000);
+      }
+
       this.saveStatus(isAuthenticated);
       console.log(
         `WhatsApp status: ${isAuthenticated ? "Authenticated" : "Disconnected"}`
       );
+
       await this.closeBrowser();
       return isAuthenticated;
     } catch (err) {
       console.error("Failed to check auth status:", err);
+
       this.saveStatus(false);
       await this.closeBrowser();
       return false;
@@ -229,7 +302,8 @@ export class WhatsAppService {
     onQR: QRCallback,
     onAuth: AuthCallback,
     onError: ErrorCallback,
-    onStream: StreamCallback
+    onStream: StreamCallback,
+    onLoading?: LoadingCallback
   ) {
     console.log(`Starting connection monitoring for ${connectionId}`);
     this.activeConnections.set(connectionId, {
@@ -237,6 +311,7 @@ export class WhatsAppService {
       onAuth,
       onError,
       onStream,
+      onLoading,
     });
 
     try {
@@ -245,29 +320,17 @@ export class WhatsAppService {
       // Start streaming immediately
       this.startStreaming();
 
-      // Initial check
-      const isAuth = await this.isLoggedIn();
-      if (isAuth) {
-        console.log("Already authenticated!");
-        this.saveStatus(true);
-        // Notify all connections
-        for (const [id, callbacks] of this.activeConnections) {
-          callbacks.onAuth();
-        }
-        await this.closeAllConnections();
-        return;
-      }
-
-      // Try to get QR code immediately
-      const initialQR = await this.getQRCode();
-      if (initialQR) {
-        console.log("Initial QR code captured");
-        onQR(initialQR);
-      }
+      // Check loop for loading screen or auth immediately
+      // Actually, we'll let the interval handle it properly, but we can do one initial check?
+      // With the interval logic, it's safer to just start it.
 
       // Start monitoring interval only if not already running
       if (!this.qrMonitorInterval) {
         console.log("Starting QR monitoring interval");
+
+        // Immediate check before interval starts
+        await this.monitorAllConnections();
+
         this.qrMonitorInterval = setInterval(() => {
           this.monitorAllConnections().catch((err) => {
             console.error("Error in monitoring interval:", err);
@@ -328,6 +391,19 @@ export class WhatsAppService {
         }
         await this.closeAllConnections();
         return;
+      }
+
+      // Check for Loading Screen
+      const loadingState = await this.checkForLoadingScreen();
+      if (loadingState.isLoading) {
+        const { percent, message } = loadingState;
+        console.log(`WhatsApp Loading: ${message}`);
+        for (const [id, callbacks] of this.activeConnections) {
+          if (callbacks.onLoading) {
+            callbacks.onLoading(percent, message);
+          }
+        }
+        return; // Don't check QR code if loading
       }
 
       // Get QR code and broadcast to all connections

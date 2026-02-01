@@ -7,6 +7,10 @@ export function ConnectWhatsApp() {
   >("disconnected");
   const [qrCode, setQrCode] = useState<string | null>(null);
   const [streamImage, setStreamImage] = useState<string | null>(null);
+  const [loadingInfo, setLoadingInfo] = useState<{
+    percent: number;
+    message: string;
+  } | null>(null);
   const [ws, setWs] = useState<WebSocket | null>(null);
 
   const handleConnect = () => {
@@ -17,6 +21,7 @@ export function ConnectWhatsApp() {
     setState("connecting");
     setQrCode(null);
     setStreamImage(null);
+    setLoadingInfo(null);
 
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
     const wsUrl = `${protocol}//${window.location.host}/api/whatsapp/connect`;
@@ -32,8 +37,11 @@ export function ConnectWhatsApp() {
       if (data.type === "qr") {
         setQrCode(data.qrCode);
         setStreamImage(null);
+        setLoadingInfo(null);
       } else if (data.type === "stream") {
         setStreamImage(data.image);
+      } else if (data.type === "loading") {
+        setLoadingInfo({ percent: data.percent, message: data.message });
       } else if (data.type === "authenticated") {
         setState("connected");
         // Reload page to update auth state in App
@@ -67,6 +75,7 @@ export function ConnectWhatsApp() {
     setState("disconnected");
     setQrCode(null);
     setStreamImage(null);
+    setLoadingInfo(null);
   };
 
   useEffect(() => {
@@ -119,7 +128,34 @@ export function ConnectWhatsApp() {
                   <img src={qrCode} alt="WhatsApp QR Code" />
                 ) : (
                   <div class="loading-placeholder">
-                    <p>Opening browser...</p>
+                    {loadingInfo ? (
+                      <div style={{ textAlign: "center" }}>
+                        <p style={{ fontWeight: "bold", fontSize: "1.1em" }}>
+                          {loadingInfo.message}
+                        </p>
+                        <div
+                          style={{
+                            width: "80%",
+                            height: "8px",
+                            background: "#e0e0e0",
+                            margin: "10px auto",
+                            borderRadius: "4px",
+                            overflow: "hidden",
+                          }}
+                        >
+                          <div
+                            style={{
+                              width: `${loadingInfo.percent}%`,
+                              height: "100%",
+                              background: "#00a884",
+                              transition: "width 0.3s ease",
+                            }}
+                          ></div>
+                        </div>
+                      </div>
+                    ) : (
+                      <p>Opening browser...</p>
+                    )}
                   </div>
                 )}
               </div>
