@@ -498,14 +498,15 @@ export class WhatsAppService {
               return false;
             }
 
-            const svg = lastMessage.querySelector("svg");
-            if (!svg) {
+            const svgs = lastMessage.querySelectorAll("svg");
+            const lastSvg = svgs[svgs.length - 1];
+            if (!lastSvg) {
               console.log(
                 "[WaitForFunction] SVG element not found in last message"
               );
             }
             // The status icon container is the parent of the SVG
-            const statusContainer = svg?.parentElement;
+            const statusContainer = lastSvg?.parentElement;
 
             if (!statusContainer) {
               console.log(
