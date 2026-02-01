@@ -26,7 +26,8 @@
     "typecheck:client": "tsc --noEmit -p client",
     "format": "prettier --write .",
     "prepare": "husky",
-    "lint-staged": "lint-staged"
+    "lint-staged": "lint-staged",
+    "win:startup": "npm run start:pm2 && concurrently \"cloudflared tunnel run wappflow\" \"npm run logs:pm2\""
   },
   "lint-staged": {
     "*.{ts,tsx,js,jsx,json,css,md}": [

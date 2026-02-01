@@ -83,16 +83,16 @@
 To ensure the application starts automatically when your Windows machine restarts:
 
 1.  **Locate the Startup Script**:
-    There is a `scripts\start_app.bat` file in the project.
+    There is a `scripts\wappflow_startup.bat` file in the project.
 
 2.  **Add to Startup Folder**:
     - Press `Win + R`, type `shell:startup`, and press Enter. This opens your user's Startup folder.
-    - **Right-click** and drag the `scripts\start_app.bat` file from the project folder into the Startup folder.
+    - **Right-click** and drag the `scripts\wappflow_startup.bat` file from the project folder into the Startup folder.
     - Select **"Create shortcuts here"** from the context menu.
 
 ### Linux & macOS
 
-For Unix-based systems, you can use the `scripts/start_app.sh` script manually, but the recommended way to ensure auto-start on boot is using PM2's native startup generation:
+For Unix-based systems, you can use the `scripts/wappflow_startup.sh` script manually, but the recommended way to ensure auto-start on boot is using PM2's native startup generation:
 
 1.  **Start the app once**:
 
@@ -116,7 +116,7 @@ For Unix-based systems, you can use the `scripts/start_app.sh` script manually, 
 Alternatively, you can use the provided script for manual starting:
 
 ```bash
-./scripts/start_app.sh
+./scripts/wappflow_startup.sh
 ```
 
 ## 🔗 Connecting WhatsApp
