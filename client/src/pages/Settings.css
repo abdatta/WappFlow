@@ -42,11 +42,11 @@
 }
 
 input:checked + .slider {
-  background-color: var(--primary, #de4994); /* Use primary color or fallback */
+  background-color: var(--primary, #00a884); /* Use primary color or fallback */
 }
 
 input:focus + .slider {
-  box-shadow: 0 0 1px var(--primary, #de4994);
+  box-shadow: 0 0 1px var(--primary, #00a884);
 }
 
 input:checked + .slider:before {
@@ -140,10 +140,10 @@ input:checked + .slider:before {
 .permission-status.granted {
   background: linear-gradient(
     135deg,
-    hsla(330, 70%, 58%, 0.15),
-    hsla(330, 70%, 48%, 0.15)
+    hsla(142, 70%, 58%, 0.15),
+    hsla(142, 70%, 48%, 0.15)
   );
-  border-color: hsla(330, 70%, 58%, 0.3);
+  border-color: hsla(142, 70%, 58%, 0.3);
   color: var(--status-sent);
 }
 
@@ -171,10 +171,10 @@ input:checked + .slider:before {
   padding: 1rem;
   background: linear-gradient(
     135deg,
-    hsla(330, 70%, 58%, 0.1),
-    hsla(330, 70%, 48%, 0.1)
+    hsla(142, 70%, 58%, 0.1),
+    hsla(142, 70%, 48%, 0.1)
   );
-  border: 1px solid hsla(330, 70%, 58%, 0.3);
+  border: 1px solid hsla(142, 70%, 58%, 0.3);
   border-radius: var(--radius-lg);
   color: var(--status-sent);
   margin-top: 1rem;

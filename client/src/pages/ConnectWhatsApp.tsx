@@ -147,7 +147,7 @@ export function ConnectWhatsApp() {
                             style={{
                               width: `${loadingInfo.percent}%`,
                               height: "100%",
-                              background: "#DE4994",
+                              background: "#00a884",
                               transition: "width 0.3s ease",
                             }}
                           ></div>
