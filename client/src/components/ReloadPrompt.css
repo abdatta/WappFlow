@@ -35,7 +35,7 @@
 }
 
 .reload-prompt-icon {
-  color: #00a884;
+  color: #de4994;
   display: flex;
   flex-shrink: 0;
 }
@@ -58,7 +58,7 @@
 }
 
 .reload-btn-primary {
-  background-color: #00a884;
+  background-color: #de4994;
   color: #111b21;
   border: none;
   padding: 0.4rem 1rem; /* Slightly larger targets */
@@ -70,7 +70,7 @@
 }
 
 .reload-btn-primary:hover {
-  background-color: #008f6f;
+  background-color: #c82a7a;
 }
 
 .reload-close-btn {

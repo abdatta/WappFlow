@@ -2,7 +2,7 @@
 
 :root {
   /* Modern Color Palette - HSL based */
-  --primary-hue: 142;
+  --primary-hue: 330;
   --primary: hsl(var(--primary-hue), 70%, 58%);
   --primary-light: hsl(var(--primary-hue), 70%, 68%);
   --primary-dark: hsl(var(--primary-hue), 70%, 48%);
@@ -30,7 +30,7 @@
 
   /* Status colors */
   --status-pending: hsl(45, 90%, 60%);
-  --status-sent: hsl(142, 70%, 58%);
+  --status-sent: hsl(330, 70%, 58%);
   --status-failed: hsl(0, 70%, 58%);
   --status-completed: hsl(200, 70%, 58%);
 
